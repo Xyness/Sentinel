@@ -37,6 +37,7 @@ POST /predict
 
 Exemple de requête JSON :
 
+```json
 {
   "symbol": "BTC-USDT",
   "z_score_price": 2.41,
@@ -44,14 +45,17 @@ Exemple de requête JSON :
   "rolling_price_std": 0.0018,
   "rolling_volume_std": 12.4
 }
+```
 
 Exemple de réponse JSON :
 
+```json
 {
   "symbol": "BTC-USDT",
   "anomaly_score": -0.37,
   "is_anomaly": true
 }
+```
 
 Le champ anomaly_score correspond au score continu retourné par
 Isolation Forest. Une valeur plus faible indique un comportement plus atypique.
@@ -78,16 +82,19 @@ Kafka → Spark Structured Streaming (Java)
 ## Lancement de l’API
 
 Installation des dépendances :
-
+```bash
 pip install -r requirements.txt
+```
 
 Démarrage du serveur :
-
+```bash
 uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
 Documentation interactive :
-
+```bash
 http://localhost:8000/docs
+```
 
 ## Remarques académiques
 
