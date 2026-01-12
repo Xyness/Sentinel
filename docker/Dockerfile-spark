@@ -1,0 +1,5 @@
+FROM bitnami/spark:latest
+
+COPY ../spark-java/ /opt/spark-apps/
+
+WORKDIR /opt/spark-apps/

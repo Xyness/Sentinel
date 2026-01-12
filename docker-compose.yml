@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: zookeeper
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+
+  spark:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile-spark
+    container_name: spark
+    depends_on:
+      - kafka
+    ports:
+      - "4040:4040"
+    command: >
+      spark-submit --class StreamingJob --master local[*] /opt/spark-apps/StreamingJob.jar
+
+  api:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile-api
+    container_name: api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - spark
+
+  dashboard:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile-dashboard
+    container_name: dashboard
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
