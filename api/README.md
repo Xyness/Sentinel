@@ -62,6 +62,7 @@ Isolation Forest. Une valeur plus faible indique un comportement plus atypique.
 
 ## Architecture
 
+```bash
 Kafka → Spark Structured Streaming (Java)
            |
            | Feature engineering
@@ -71,6 +72,7 @@ Kafka → Spark Structured Streaming (Java)
            | Score d’anomalie
            v
         Dashboard / Stockage / Alertes
+```
 
 ## Stack technique
 
