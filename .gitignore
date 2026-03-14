@@ -1,1 +1,30 @@
 docs/choices.md
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Java
+target/
+*.class
+*.jar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# Data & Models
+data/
+models/
+*.parquet
+
+# OS
+.DS_Store
+Thumbs.db

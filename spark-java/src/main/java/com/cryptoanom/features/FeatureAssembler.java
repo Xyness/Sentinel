@@ -3,6 +3,8 @@ package com.cryptoanom.features;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 
+import static org.apache.spark.sql.functions.col;
+
 public class FeatureAssembler {
 
     public static Dataset<Row> buildFeatures(Dataset<Row> stream) {
@@ -11,6 +13,14 @@ public class FeatureAssembler {
 
         Dataset<Row> enriched = TechnicalIndicators.addZScore(rolling);
 
-        return enriched;
+        // Select only the columns needed downstream (ML training + API)
+        return enriched.select(
+                col("symbol"),
+                col("z_score_price"),
+                col("z_score_volume"),
+                col("rolling_price_std"),
+                col("rolling_volume_std"),
+                col("is_anomaly")
+        );
     }
 }

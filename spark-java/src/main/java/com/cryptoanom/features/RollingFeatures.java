@@ -17,9 +17,12 @@ public class RollingFeatures {
                 window(col("event_time"), windowDuration)
         ).agg(
                 avg("price").alias("rolling_price_mean"),
-                stddev("price").alias("rolling_price_std"),
+                coalesce(stddev("price"), lit(0.0)).alias("rolling_price_std"),
                 avg("volume").alias("rolling_volume_mean"),
-                stddev("volume").alias("rolling_volume_std")
+                coalesce(stddev("volume"), lit(0.0)).alias("rolling_volume_std"),
+                avg("log_return").alias("log_return"),
+                max("volume").alias("volume"),
+                max(col("is_anomaly").cast("integer")).alias("is_anomaly")
         );
     }
 }

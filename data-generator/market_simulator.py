@@ -1,8 +1,9 @@
-# market_simulator.py
-
 import numpy as np
 import random
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MarketSimulator:
@@ -57,7 +58,7 @@ class MarketSimulator:
             "timestamp": int(time.time()),
             "symbol": self.symbol,
             "price": round(self.price, 2),
-            "volume": round(volume, 4),
+            "volume": round(volume, 6),
             "log_return": round(float(log_return), 6),
             "is_anomaly": is_anomaly,
             "anomaly_type": anomaly_type

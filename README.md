@@ -1,127 +1,292 @@
 # CryptoAnom
-### Détection d’Anomalies sur Marchés Crypto en Temps Réel
-**Big Data • Streaming • Machine Learning • Finance**
+
+**Real-time anomaly detection on cryptocurrency markets**
+
+Big Data | Streaming | Machine Learning | Finance
 
 ---
 
-## 📌 Présentation
-CryptoAnom est une plateforme Big Data conçue pour analyser en temps réel des flux
-de données financières issues des marchés de crypto-monnaies, dans le but de détecter
-automatiquement des comportements anormaux ou potentiellement frauduleux à l’aide
-de techniques de Machine Learning non supervisées.
+## Overview
 
-Ce projet a été développé dans le cadre **d'étude des marchés financiers et d'analyses d'actifs numériques**.
+CryptoAnom is a Big Data platform that analyzes cryptocurrency market data streams in real time to automatically detect anomalous or suspicious behavior using unsupervised Machine Learning.
+
+The system supports both **simulated data** (with injected anomalies for evaluation) and **real market data** from Binance via WebSocket.
 
 ---
 
-## 🎯 Problématique
-Les marchés de crypto-monnaies génèrent des volumes massifs de données en continu
-et présentent une forte volatilité. Cette combinaison rend la détection manuelle
-d’anomalies (manipulations de marché, comportements atypiques) particulièrement
-complexe.
+## Architecture
 
-L’objectif est donc de concevoir un système capable de :
-- traiter des données financières en **temps réel**,
-- extraire des **indicateurs pertinents**,
-- détecter automatiquement des anomalies **sans supervision**,
-- tout en étant **scalable** et **reproductible**.
-
----
-
-## 🧱 Architecture Générale
-Le système repose sur une architecture distribuée orientée streaming :
-
-1. Génération ou ingestion de données crypto
-2. Ingestion temps réel avec Apache Kafka
-3. Traitement avec Spark Structured Streaming (Java)
-4. Feature engineering financier
-5. Détection d’anomalies par modèles ML
-6. Stockage des résultats
-7. Exposition via API et visualisation
-
-*(Un schéma détaillé est disponible dans le dossier `docs/`.)*
-
----
-
-## 📊 Données
-Dans la version actuelle :
-- Données crypto **simulées** réalistes (prix, volumes, volatilité)
-- Génération d’anomalies contrôlées (pics de volume, ruptures de tendance)
-
-Cette approche permet :
-- une évaluation rigoureuse,
-- une reproductibilité complète,
-- une future extension vers des données réelles (API Binance).
-
----
-
-## 🧠 Feature Engineering
-Les caractéristiques extraites incluent notamment :
-- variations de prix (Δp)
-- volumes anormaux
-- volatilité glissante
-- moyennes et écarts-types mobiles
-- indicateurs financiers (z-score, RSI, MACD)
-
-Ces features sont calculées en streaming à l’aide de Spark.
-
----
-
-## 🤖 Modèles de Machine Learning
-Le projet utilise des modèles **non supervisés**, adaptés à la détection d’anomalies :
-
-- **Isolation Forest** (modèle principal)
-- Autoencoder (comparaison optionnelle)
-
-L’entraînement est effectué en mode batch, tandis que l’inférence est réalisée
-en temps réel sur les flux de données.
+```
+                          +------------------+
+                          |  Data Generator   |
+                          |  (Simulated or    |
+                          |   Binance Live)   |
+                          +--------+---------+
+                                   |
+                                   v
+                          +------------------+
+                          |   Apache Kafka    |
+                          |  (crypto-market)  |
+                          +--------+---------+
+                                   |
+                                   v
+                          +------------------+
+                          |  Spark Streaming  |
+                          |  (Java)           |
+                          |  - Rolling stats  |
+                          |  - Z-scores       |
+                          +--------+---------+
+                                   |
+                                   v
+                          +------------------+
+                          |  Parquet Files    |
+                          |  (partitioned by  |
+                          |   symbol)         |
+                          +--------+---------+
+                                   |
+                                   v
+                          +------------------+
+                          |  ML Training      |
+                          |  Isolation Forest  |
+                          |  (scikit-learn)   |
+                          +--------+---------+
+                                   |
+                                   v
+                          +------------------+
+                          |  FastAPI          |
+                          |  /predict /health |
+                          +--------+---------+
+                                   |
+                                   v
+                          +------------------+
+                          |  Streamlit        |
+                          |  Dashboard        |
+                          +------------------+
+```
 
 ---
 
-## 📈 Évaluation
-L’évaluation repose sur :
-- l’injection d’anomalies connues,
-- des métriques quantitatives (precision, recall),
-- une analyse qualitative des faux positifs / faux négatifs.
+## Quick Start
 
-Cette méthodologie permet de mesurer la robustesse du système face à la volatilité
-des marchés.
+### Prerequisites
 
----
-
-## 🛠️ Stack Technique
-**Big Data**
-- Apache Kafka
-- Apache Spark Structured Streaming (Java)
-- Parquet / Delta Lake
-
-**Machine Learning**
-- Python
-- scikit-learn / PyTorch
-
-**Backend & Visualisation**
-- FastAPI
-- PostgreSQL / Elasticsearch
-- Dashboard interactif
-
-**Infrastructure**
 - Docker & Docker Compose
 
+### Run with simulated data (default)
+
+```bash
+docker-compose up --build
+```
+
+### Run with real Binance market data
+
+```bash
+DATA_SOURCE=binance docker-compose up --build
+```
+
+### Access the services
+
+| Service       | URL                          |
+|---------------|------------------------------|
+| Dashboard     | http://localhost:8501         |
+| API           | http://localhost:8000         |
+| API docs      | http://localhost:8000/docs    |
+| Spark UI      | http://localhost:4040         |
+
 ---
 
-## 📁 Structure du Projet
-```text
-crypto-anomaly-detection/
-├── data-generator/
-├── kafka/
-├── spark-java/
-│ ├── streaming/
-│ └── features/
-├── ml-python/
-│ ├── training/
-│ └── evaluation/
-├── api/
-├── dashboard/
+## Data Pipeline
+
+### 1. Data Generation
+
+**Simulated mode** generates realistic crypto market events (BTC-USDT, ETH-USDT, BNB-USDT) with configurable anomaly injection (price spikes, volume spikes, flash crashes).
+
+**Binance mode** streams real trades via WebSocket from Binance's public API (no API key required).
+
+Both modes produce events in the same format:
+
+```json
+{
+  "timestamp": 1710000000,
+  "symbol": "BTC-USDT",
+  "price": 43150.50,
+  "volume": 12.534210,
+  "log_return": 0.003521,
+  "is_anomaly": false,
+  "anomaly_type": null
+}
+```
+
+### 2. Stream Processing (Spark)
+
+Apache Spark Structured Streaming consumes from Kafka and computes rolling window features:
+
+- **Rolling statistics**: price mean/std, volume mean/std (1-minute tumbling windows)
+- **Technical indicators**: price z-score, volume z-score
+- **Division-by-zero protection**: returns 0 when standard deviation is 0
+
+Output is written as Parquet files, partitioned by symbol.
+
+### 3. ML Training
+
+The Isolation Forest model trains on the computed features:
+
+- **Simulated data**: train/test split (80/20) with classification report
+- **Real data**: fully unsupervised training (no labels available)
+- Features: `z_score_price`, `z_score_volume`, `rolling_price_std`, `rolling_volume_std`
+- StandardScaler normalization
+- 200 estimators, 1% contamination rate
+
+### 4. API
+
+FastAPI service exposing:
+
+- `POST /predict` — anomaly detection on a feature vector
+- `GET /health` — health check with model status
+- Auto-generated Swagger docs at `/docs`
+
+The API starts immediately and loads the model lazily once training completes.
+
+### 5. Dashboard
+
+Streamlit interface with:
+
+- Feature input sliders for manual testing
+- Anomaly score display with alerts
+- Prediction history with metrics and charts
+
+---
+
+## Project Structure
+
+```
+CryptoAnom/
+├── api/                        # FastAPI anomaly detection service
+│   ├── main.py                 #   API routes (/predict, /health)
+│   ├── model_loader.py         #   Model loading with lazy init
+│   ├── schemas.py              #   Pydantic request/response models
+│   └── requirements.txt
+├── dashboard/                  # Streamlit visualization
+│   ├── app.py                  #   Dashboard UI
+│   ├── api_client.py           #   HTTP client for API
+│   └── requirements.txt
+├── data-generator/             # Market data producers
+│   ├── generator.py            #   Main entry (dispatches sim/real)
+│   ├── market_simulator.py     #   Simulated price dynamics (GBM)
+│   ├── binance_connector.py    #   Binance WebSocket connector
+│   ├── config.py               #   Configuration (env vars)
+│   └── requirements.txt
+├── ml-python/                  # ML training & evaluation
+│   ├── training/
+│   │   ├── train_isolation_forest.py
+│   │   ├── load_dataset.py
+│   │   └── preprocess.py
+│   ├── evaluation/
+│   │   └── evaluate.py
+│   ├── train_runner.py         #   Wait-for-data + train orchestrator
+│   └── requirements.txt
+├── spark-java/                 # Spark Structured Streaming
+│   ├── pom.xml                 #   Maven config (Spark 3.5, Kafka)
+│   └── src/main/java/com/cryptoanom/
+│       ├── streaming/
+│       │   └── CryptoStreamJob.java
+│       └── features/
+│           ├── FeatureAssembler.java
+│           ├── RollingFeatures.java
+│           └── TechnicalIndicators.java
+├── docker/                     # Dockerfiles
+│   ├── Dockerfile-api
+│   ├── Dockerfile-dashboard
+│   ├── Dockerfile-generator
+│   ├── Dockerfile-ml
+│   └── Dockerfile-spark        #   Multi-stage Maven build
+├── tests/                      # Unit tests (pytest)
+│   ├── test_api.py
+│   ├── test_binance_connector.py
+│   ├── test_config.py
+│   ├── test_market_simulator.py
+│   └── test_preprocess.py
 ├── docs/
-│ └── report.pdf
-└── docker-compose.yml
+│   ├── report.md
+│   ├── choices.md
+│   └── architecture.png
+├── docker-compose.yml          # Full orchestration (7 services)
+└── pytest.ini
+```
+
+---
+
+## Tech Stack
+
+| Layer              | Technology                                    |
+|--------------------|-----------------------------------------------|
+| Message Broker     | Apache Kafka 3.6                              |
+| Stream Processing  | Apache Spark Structured Streaming 3.5 (Java)  |
+| Storage            | Parquet (columnar, partitioned)                |
+| ML                 | scikit-learn (Isolation Forest)                |
+| API                | FastAPI + Uvicorn                              |
+| Dashboard          | Streamlit                                     |
+| Real Data          | Binance WebSocket API                         |
+| Infrastructure     | Docker, Docker Compose                        |
+| Build              | Maven (Java), pip (Python)                    |
+
+---
+
+## Configuration
+
+All services are configurable via environment variables:
+
+| Variable                  | Default           | Description                        |
+|---------------------------|-------------------|------------------------------------|
+| `DATA_SOURCE`             | `simulated`       | `simulated` or `binance`           |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092`  | Kafka broker address               |
+| `KAFKA_TOPIC`             | `crypto-market`   | Kafka topic name                   |
+| `EVENT_FREQUENCY_SECONDS` | `1`               | Simulated event interval           |
+| `ANOMALY_PROBABILITY`     | `0.01`            | Simulated anomaly rate             |
+| `MODEL_PATH`              | `models/...`      | Path to saved model bundle         |
+| `FEATURES_PATH`           | `data/features`   | Parquet features directory         |
+| `API_BASE_URL`            | `http://localhost:8000` | API URL for dashboard        |
+| `MIN_PARQUET_FILES`       | `3`               | Min files before training starts   |
+| `MAX_WAIT_SECONDS`        | `600`             | Training timeout                   |
+
+---
+
+## Docker Services
+
+| Service          | Port  | Description                                |
+|------------------|-------|--------------------------------------------|
+| zookeeper        | 2181  | Kafka coordinator                          |
+| kafka            | 9092  | Message broker                             |
+| data-generator   | —     | Produces market events to Kafka            |
+| spark            | 4040  | Stream processing, feature engineering     |
+| ml-training      | —     | Waits for data, trains model, exits        |
+| api              | 8000  | ML inference API                           |
+| dashboard        | 8501  | Web UI                                     |
+
+Shared Docker volumes:
+- `features-data`: Spark writes, ML training reads
+- `checkpoint-data`: Spark streaming checkpoints
+- `model-data`: ML training writes, API reads
+
+---
+
+## Testing
+
+```bash
+pip install -r tests/requirements.txt
+pytest
+```
+
+Tests cover:
+- Market simulator (event structure, anomalies, log returns)
+- Binance connector (symbol mapping, message parsing, log returns)
+- Preprocessing (NaN handling, labeled/unlabeled modes)
+- API (schemas validation, endpoints, error handling)
+- Configuration (defaults, env overrides)
+
+---
+
+## Documentation
+
+- [`docs/report.md`](docs/report.md) — Technical report
+- [`docs/choices.md`](docs/choices.md) — Design decisions and justifications

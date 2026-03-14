@@ -1,0 +1,12 @@
+.git
+.gitignore
+*.md
+docs/
+tests/
+pytest.ini
+__pycache__
+*.pyc
+.idea/
+.vscode/
+*.iml
+target/

@@ -11,11 +11,18 @@ public class TechnicalIndicators {
 
         return df.withColumn(
                 "z_score_price",
-                col("log_return").divide(col("rolling_price_std"))
+                when(col("rolling_price_std").equalTo(0), lit(0.0))
+                        .otherwise(
+                                col("log_return").minus(col("rolling_price_mean"))
+                                        .divide(col("rolling_price_std"))
+                        )
         ).withColumn(
                 "z_score_volume",
-                col("volume").minus(col("rolling_volume_mean"))
-                        .divide(col("rolling_volume_std"))
+                when(col("rolling_volume_std").equalTo(0), lit(0.0))
+                        .otherwise(
+                                col("volume").minus(col("rolling_volume_mean"))
+                                        .divide(col("rolling_volume_std"))
+                        )
         );
     }
 }

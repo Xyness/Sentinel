@@ -1,17 +1,34 @@
 version: "3.8"
 
+volumes:
+  features-data:
+  checkpoint-data:
+  model-data:
+
 services:
 
+  # --- Infrastructure ---
+
   zookeeper:
-    image: bitnami/zookeeper:latest
+    image: bitnami/zookeeper:3.9
     container_name: zookeeper
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
     ports:
       - "2181:2181"
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
 
   kafka:
-    image: bitnami/kafka:latest
+    image: bitnami/kafka:3.6
     container_name: kafka
     environment:
       - KAFKA_BROKER_ID=1
@@ -21,36 +38,139 @@ services:
     ports:
       - "9092:9092"
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  # --- Data Pipeline ---
+
+  data-generator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-generator
+    container_name: data-generator
+    environment:
+      - DATA_SOURCE=${DATA_SOURCE:-simulated}  # "simulated" or "binance"
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=crypto-market
+      - EVENT_FREQUENCY_SECONDS=1
+      - ANOMALY_PROBABILITY=0.01
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
 
   spark:
     build:
-      context: ./docker
-      dockerfile: Dockerfile-spark
+      context: .
+      dockerfile: docker/Dockerfile-spark
     container_name: spark
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=crypto-market
+      - OUTPUT_PATH=/data/features
+      - CHECKPOINT_PATH=/data/checkpoints/cryptoanom
+    volumes:
+      - features-data:/data/features
+      - checkpoint-data:/data/checkpoints
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     ports:
       - "4040:4040"
     command: >
-      spark-submit --class StreamingJob --master local[*] /opt/spark-apps/StreamingJob.jar
+      spark-submit
+        --class com.cryptoanom.streaming.CryptoStreamJob
+        --master local[*]
+        /opt/spark-apps/app.jar
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+
+  # --- ML Training ---
+
+  ml-training:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-ml
+    container_name: ml-training
+    environment:
+      - FEATURES_PATH=/data/features
+      - MODEL_PATH=/models/isolation_forest.joblib
+      - MIN_PARQUET_FILES=3
+      - CHECK_INTERVAL_SECONDS=15
+      - MAX_WAIT_SECONDS=600
+    volumes:
+      - features-data:/data/features:ro
+      - model-data:/models
+    depends_on:
+      - spark
+      - data-generator
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  # --- API & Dashboard ---
 
   api:
     build:
-      context: ./docker
-      dockerfile: Dockerfile-api
+      context: .
+      dockerfile: docker/Dockerfile-api
     container_name: api
+    environment:
+      - MODEL_PATH=/models/isolation_forest.joblib
+    volumes:
+      - model-data:/models:ro
     ports:
       - "8000:8000"
     depends_on:
-      - spark
+      - ml-training
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
 
   dashboard:
     build:
-      context: ./docker
-      dockerfile: Dockerfile-dashboard
+      context: .
+      dockerfile: docker/Dockerfile-dashboard
     container_name: dashboard
+    environment:
+      - API_BASE_URL=http://api:8000
     ports:
       - "8501:8501"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"

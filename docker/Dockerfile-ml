@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY ml-python/ ./ml-python/
+
+RUN pip install --no-cache-dir -r ml-python/requirements.txt
+
+RUN useradd --create-home appuser
+USER appuser
+
+CMD ["python", "ml-python/train_runner.py"]

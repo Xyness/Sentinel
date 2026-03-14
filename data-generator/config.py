@@ -1,7 +1,10 @@
-# config.py
+import os
 
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
-KAFKA_TOPIC = "crypto-market"
+# Data source: "simulated" or "binance"
+DATA_SOURCE = os.environ.get("DATA_SOURCE", "simulated")
+
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "crypto-market")
 
 SYMBOLS = {
     "BTC-USDT": {
@@ -18,6 +21,6 @@ SYMBOLS = {
     }
 }
 
-EVENT_FREQUENCY_SECONDS = 1
+EVENT_FREQUENCY_SECONDS = int(os.environ.get("EVENT_FREQUENCY_SECONDS", "1"))
 
-ANOMALY_PROBABILITY = 0.01  # 1%
+ANOMALY_PROBABILITY = float(os.environ.get("ANOMALY_PROBABILITY", "0.01"))

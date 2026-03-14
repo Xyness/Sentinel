@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY data-generator/ ./data-generator/
+
+RUN pip install --no-cache-dir -r data-generator/requirements.txt
+
+RUN useradd --create-home appuser
+USER appuser
+
+CMD ["python", "data-generator/generator.py"]
