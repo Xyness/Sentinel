@@ -17,13 +17,12 @@ class TestConfig:
         assert config.EVENT_FREQUENCY_SECONDS >= 1
         assert 0 < config.ANOMALY_PROBABILITY <= 1.0
 
-    def test_data_source_binance(self):
-        os.environ["DATA_SOURCE"] = "binance"
+    def test_data_source_binance(self, monkeypatch):
+        monkeypatch.setenv("DATA_SOURCE", "binance")
         import importlib
         import config
         importlib.reload(config)
         assert config.DATA_SOURCE == "binance"
-        del os.environ["DATA_SOURCE"]
 
     def test_symbols_structure(self):
         from config import SYMBOLS
@@ -35,9 +34,9 @@ class TestConfig:
             assert params["initial_price"] > 0
             assert params["volatility"] > 0
 
-    def test_env_override(self):
-        os.environ["KAFKA_BOOTSTRAP_SERVERS"] = "custom-host:9093"
-        os.environ["KAFKA_TOPIC"] = "test-topic"
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("KAFKA_BOOTSTRAP_SERVERS", "custom-host:9093")
+        monkeypatch.setenv("KAFKA_TOPIC", "test-topic")
 
         import importlib
         import config
@@ -45,7 +44,3 @@ class TestConfig:
 
         assert config.KAFKA_BOOTSTRAP_SERVERS == "custom-host:9093"
         assert config.KAFKA_TOPIC == "test-topic"
-
-        # Cleanup
-        del os.environ["KAFKA_BOOTSTRAP_SERVERS"]
-        del os.environ["KAFKA_TOPIC"]

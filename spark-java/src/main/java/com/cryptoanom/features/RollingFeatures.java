@@ -16,12 +16,13 @@ public class RollingFeatures {
                 col("symbol"),
                 window(col("event_time"), windowDuration)
         ).agg(
-                avg("price").alias("rolling_price_mean"),
-                coalesce(stddev("price"), lit(0.0)).alias("rolling_price_std"),
+                avg("log_return").alias("rolling_log_return_mean"),
+                coalesce(stddev("log_return"), lit(0.0)).alias("rolling_log_return_std"),
                 avg("volume").alias("rolling_volume_mean"),
                 coalesce(stddev("volume"), lit(0.0)).alias("rolling_volume_std"),
-                avg("log_return").alias("log_return"),
-                max("volume").alias("volume"),
+                last("log_return").alias("log_return"),
+                last("volume").alias("volume"),
+                coalesce(stddev("price"), lit(0.0)).alias("rolling_price_std"),
                 max(col("is_anomaly").cast("integer")).alias("is_anomaly")
         );
     }

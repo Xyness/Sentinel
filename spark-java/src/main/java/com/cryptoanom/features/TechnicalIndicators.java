@@ -11,10 +11,10 @@ public class TechnicalIndicators {
 
         return df.withColumn(
                 "z_score_price",
-                when(col("rolling_price_std").equalTo(0), lit(0.0))
+                when(col("rolling_log_return_std").equalTo(0), lit(0.0))
                         .otherwise(
-                                col("log_return").minus(col("rolling_price_mean"))
-                                        .divide(col("rolling_price_std"))
+                                col("log_return").minus(col("rolling_log_return_mean"))
+                                        .divide(col("rolling_log_return_std"))
                         )
         ).withColumn(
                 "z_score_volume",

@@ -38,8 +38,9 @@ The project initially uses simulated crypto data.
 The injected anomalies (volume spikes, trend breaks, abnormal volatility)
 provide a pseudo "ground truth" for evaluating system performance.
 
-The transition to real data (e.g. Binance API) is planned as a future
-extension of the project.
+A real-data mode using the Binance WebSocket API has been implemented,
+allowing the system to switch between simulated and live market data
+via the `DATA_SOURCE` environment variable.
 
 ---
 
@@ -232,7 +233,6 @@ A single command launches the entire pipeline.
 
 ## 14. Current project limitations
 
-- simulated data only
 - single primary model
 - no automatic retraining
 - no advanced long-term storage
@@ -243,7 +243,6 @@ These limitations are acknowledged and clearly identified.
 
 ## 15. Future perspectives
 
-- real data ingestion (Binance)
 - comparison with other models
 - advanced alerting
 - analytical storage (Delta Lake, Elasticsearch)

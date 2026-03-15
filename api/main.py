@@ -47,6 +47,11 @@ def predict(features: FeatureVector):
         score, is_anomaly = model.predict(feature_array)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"Prediction failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
     logger.info(
         f"Prediction for {features.symbol}: "

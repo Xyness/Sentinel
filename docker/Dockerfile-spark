@@ -10,8 +10,10 @@ COPY spark-java/src ./src
 RUN mvn package -DskipTests -B
 
 # Stage 2: Runtime with Spark
-FROM bitnami/spark:3.5
+FROM apache/spark:3.5.3
 
+USER root
+RUN mkdir -p /opt/spark-apps
 COPY --from=builder /build/target/spark-java-1.0-SNAPSHOT.jar /opt/spark-apps/app.jar
 
 WORKDIR /opt/spark-apps/

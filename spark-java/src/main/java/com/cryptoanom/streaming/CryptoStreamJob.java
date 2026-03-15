@@ -2,6 +2,7 @@ package com.cryptoanom.streaming;
 
 import com.cryptoanom.features.FeatureAssembler;
 import org.apache.spark.sql.*;
+import org.apache.spark.sql.streaming.StreamingQuery;
 import org.apache.spark.sql.types.*;
 import static org.apache.spark.sql.functions.*;
 
@@ -21,7 +22,6 @@ public class CryptoStreamJob {
 
         SparkSession spark = SparkSession.builder()
                 .appName("CryptoAnom-Streaming")
-                .master("local[*]")
                 .getOrCreate();
 
         spark.sparkContext().setLogLevel("WARN");

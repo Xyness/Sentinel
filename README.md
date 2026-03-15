@@ -201,6 +201,7 @@ CryptoAnom/
 │   ├── Dockerfile-ml
 │   └── Dockerfile-spark        #   Multi-stage Maven build
 ├── tests/                      # Unit tests (pytest)
+│   ├── requirements.txt
 │   ├── test_api.py
 │   ├── test_binance_connector.py
 │   ├── test_config.py
@@ -208,7 +209,7 @@ CryptoAnom/
 │   └── test_preprocess.py
 ├── docs/
 │   ├── report.md
-│   ├── choices.md
+│   ├── choices-en.md
 │   └── architecture.png
 ├── docker-compose.yml          # Full orchestration (7 services)
 └── pytest.ini
@@ -220,7 +221,7 @@ CryptoAnom/
 
 | Layer              | Technology                                    |
 |--------------------|-----------------------------------------------|
-| Message Broker     | Apache Kafka 3.6                              |
+| Message Broker     | Apache Kafka 3.7 (Confluent 7.7.1)             |
 | Stream Processing  | Apache Spark Structured Streaming 3.5 (Java)  |
 | Storage            | Parquet (columnar, partitioned)                |
 | ML                 | scikit-learn (Isolation Forest)                |
@@ -289,4 +290,4 @@ Tests cover:
 ## Documentation
 
 - [`docs/report.md`](docs/report.md) — Technical report
-- [`docs/choices.md`](docs/choices.md) — Design decisions and justifications
+- [`docs/choices-en.md`](docs/choices-en.md) — Design decisions and justifications (English)

@@ -9,7 +9,6 @@ No API key required — uses public market data only.
 import json
 import time
 import logging
-import threading
 import numpy as np
 from websocket import WebSocketApp
 
@@ -99,28 +98,29 @@ class BinanceConnector:
 
     def _on_close(self, ws, close_status, close_msg):
         logger.warning(f"WebSocket closed: {close_status} - {close_msg}")
-        if self._running:
-            logger.info("Reconnecting in 5 seconds...")
-            time.sleep(5)
-            self.start()
 
     def _on_open(self, ws):
         logger.info(f"Connected to Binance WebSocket — streaming {self.symbols}")
 
     def start(self):
-        """Start the WebSocket connection (blocking)."""
-        url = self._build_stream_url()
-        logger.info(f"Connecting to {url}")
-
+        """Start the WebSocket connection with automatic reconnection (blocking)."""
         self._running = True
-        self.ws = WebSocketApp(
-            url,
-            on_message=self._on_message,
-            on_error=self._on_error,
-            on_close=self._on_close,
-            on_open=self._on_open
-        )
-        self.ws.run_forever()
+        while self._running:
+            url = self._build_stream_url()
+            logger.info(f"Connecting to {url}")
+
+            self.ws = WebSocketApp(
+                url,
+                on_message=self._on_message,
+                on_error=self._on_error,
+                on_close=self._on_close,
+                on_open=self._on_open
+            )
+            self.ws.run_forever()
+
+            if self._running:
+                logger.info("Reconnecting in 5 seconds...")
+                time.sleep(5)
 
     def stop(self):
         """Stop the WebSocket connection."""

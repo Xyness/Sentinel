@@ -1,7 +1,7 @@
 import sys
 import os
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
@@ -112,7 +112,7 @@ class TestModelLoader:
 
         score, is_anomaly = am.predict([1.0, 1.0, 0.002, 10.0])
         assert score == -0.5
-        assert is_anomaly is True
+        assert is_anomaly == True
 
 
 class TestAPIEndpoints:

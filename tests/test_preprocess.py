@@ -12,14 +12,16 @@ from preprocess import preprocess, FEATURE_COLUMNS
 class TestPreprocess:
 
     def _make_df(self, n=100, nan_count=0, anomaly_ratio=0.01):
+        rng = np.random.RandomState(42)
+        labels = rng.choice([0, 1], size=n, p=[1 - anomaly_ratio, anomaly_ratio])
+        if anomaly_ratio > 0 and labels.sum() == 0:
+            labels[0] = 1
         df = pd.DataFrame({
-            "z_score_price": np.random.randn(n),
-            "z_score_volume": np.random.randn(n),
-            "rolling_price_std": np.abs(np.random.randn(n)) * 0.001,
-            "rolling_volume_std": np.abs(np.random.randn(n)) * 10,
-            "is_anomaly": np.random.choice(
-                [0, 1], size=n, p=[1 - anomaly_ratio, anomaly_ratio]
-            ),
+            "z_score_price": rng.randn(n),
+            "z_score_volume": rng.randn(n),
+            "rolling_price_std": np.abs(rng.randn(n)) * 0.001,
+            "rolling_volume_std": np.abs(rng.randn(n)) * 10,
+            "is_anomaly": labels,
         })
         if nan_count > 0:
             idx = np.random.choice(n, nan_count, replace=False)
