@@ -1,166 +1,170 @@
-# CryptoSentinel  
-## Plateforme Big Data de Détection d’Anomalies sur Marchés Crypto en Temps Réel
+# CryptoSentinel
+## Big Data Platform for Real-Time Anomaly Detection on Crypto Markets
 
-**Auteur :** Xyness 
+**Author:** Xyness
 
 ---
 
-## Résumé
+## Abstract
 
-Les marchés de crypto-monnaies génèrent des flux massifs de données en continu
-et présentent une forte volatilité. Cette combinaison rend la détection manuelle
-d’anomalies particulièrement complexe.
+Cryptocurrency markets generate massive, continuous data streams and exhibit
+high volatility. This combination makes manual anomaly detection particularly
+challenging.
 
-Ce projet propose une plateforme Big Data capable de traiter des données
-financières en temps réel et de détecter automatiquement des comportements
-anormaux à l’aide de modèles de Machine Learning non supervisés.
+This project proposes a Big Data platform capable of processing financial data
+in real time and automatically detecting abnormal behavior using unsupervised
+Machine Learning models.
 
-L’architecture repose sur Apache Kafka pour l’ingestion, Spark Structured
-Streaming pour le traitement temps réel, un modèle Isolation Forest pour
-la détection d’anomalies, et un dashboard interactif pour la visualisation.
+The architecture relies on Apache Kafka for ingestion, Spark Structured
+Streaming for real-time processing, an Isolation Forest model for anomaly
+detection, and an interactive dashboard for visualization.
 
 ---
 
 ## 1. Introduction
 
-La détection d’anomalies sur les marchés financiers est un enjeu majeur,
-notamment dans un contexte de trading algorithmique et de surveillance
-des manipulations de marché.
+Anomaly detection in financial markets is a major challenge, especially in
+the context of algorithmic trading and market manipulation surveillance.
 
-Les crypto-monnaies constituent un terrain d’étude particulièrement
-intéressant en raison de leur forte volatilité, de l’absence de régulation
-centralisée et du volume important de données générées en continu.
+Cryptocurrencies are a particularly interesting field of study due to their
+high volatility, lack of centralized regulation, and the large volume of
+data generated continuously.
 
-L’objectif de ce projet est de concevoir un système capable de :
-- traiter des flux de données en temps réel,
-- extraire des indicateurs financiers pertinents,
-- détecter automatiquement des anomalies sans supervision,
-- proposer une architecture scalable et reproductible.
-
----
-
-## 2. Architecture générale
-
-L’architecture du système est orientée streaming et repose sur une
-séparation claire des responsabilités.
-
-1. Génération de données crypto simulées
-2. Ingestion temps réel avec Apache Kafka
-3. Traitement et feature engineering avec Spark Structured Streaming
-4. Inférence via un modèle de Machine Learning exposé par une API
-5. Visualisation des anomalies via un dashboard
-
-Cette architecture permet un découplage fort entre les composants,
-facilitant la maintenance et les évolutions futures.
+The goal of this project is to design a system capable of:
+- processing data streams in real time,
+- extracting relevant financial indicators,
+- automatically detecting anomalies without supervision,
+- providing a scalable and reproducible architecture.
 
 ---
 
-## 3. Données et simulation
+## 2. General Architecture
 
-Dans la version actuelle, les données sont simulées afin de garantir
-la reproductibilité des expériences.
+The system architecture is streaming-oriented and relies on a clear
+separation of concerns.
 
-Les données générées incluent :
-- prix
-- volume
-- volatilité
-- anomalies contrôlées (pics, ruptures)
+1. Simulated (or real) crypto data generation
+2. Real-time ingestion with Apache Kafka
+3. Processing and feature engineering with Spark Structured Streaming
+4. Inference via a Machine Learning model exposed through an API
+5. Anomaly visualization through a dashboard
 
-Cette approche permet d’évaluer précisément les performances du système
-sans dépendre d’API externes.
-
----
-
-## 4. Traitement Big Data en streaming
-
-Apache Kafka est utilisé comme système d’ingestion afin de gérer les flux
-de données en continu.
-
-Spark Structured Streaming est employé pour :
-- consommer les données depuis Kafka,
-- appliquer des fenêtres temporelles,
-- calculer des features financières en temps réel.
-
-L’utilisation de Spark permet de bénéficier d’un moteur distribué robuste
-et largement utilisé dans l’industrie.
+This architecture enables strong decoupling between components, facilitating
+maintenance and future evolution.
 
 ---
 
-## 5. Feature engineering financier
+## 3. Data and Simulation
 
-Les caractéristiques extraites incluent :
-- z-score du prix
-- z-score du volume
-- volatilité glissante du prix
-- volatilité glissante du volume
+The platform supports two data modes:
 
-Ces features sont choisies pour leur interprétabilité et leur pertinence
-dans un contexte de détection d’anomalies.
+**Simulated mode** generates realistic market events with controlled anomaly
+injection (price spikes, volume spikes, flash crashes), enabling precise
+evaluation of system performance without relying on external APIs.
 
----
+**Binance mode** streams real trades via WebSocket from Binance's public API
+(no API key required), providing genuine market conditions.
 
-## 6. Détection d’anomalies par Machine Learning
-
-Le projet adopte une approche non supervisée, plus réaliste dans un
-contexte financier où les anomalies sont rares et mal définies.
-
-Le modèle principal utilisé est l’Isolation Forest, choisi pour :
-- sa robustesse,
-- sa rapidité,
-- son adéquation à la détection d’anomalies générales.
-
-L’entraînement est réalisé en batch, tandis que l’inférence est effectuée
-en temps réel.
+Both modes produce events in the same format including: price, volume,
+log return, and anomaly labels (when available).
 
 ---
 
-## 7. API et visualisation
+## 4. Big Data Stream Processing
 
-Le modèle de Machine Learning est exposé via une API FastAPI, permettant
-une intégration simple avec les autres composants du système.
+Apache Kafka is used as the ingestion system to handle continuous data
+streams.
 
-Un dashboard Streamlit permet de visualiser les scores d’anomalie et
-de démontrer le fonctionnement du pipeline de bout en bout.
+Spark Structured Streaming is employed to:
+- consume data from Kafka,
+- apply temporal windows,
+- compute financial features in real time.
 
----
-
-## 8. Déploiement et reproductibilité
-
-L’ensemble de la plateforme est containerisé avec Docker et orchestré
-via Docker Compose.
-
-Une seule commande permet de lancer l’intégralité du système, garantissant
-une reproductibilité complète.
+Using Spark provides a robust, distributed engine widely adopted in
+industry.
 
 ---
 
-## 9. Résultats et évaluation
+## 5. Financial Feature Engineering
 
-L’évaluation repose sur l’injection d’anomalies connues dans les données
-simulées.
+The extracted features include:
+- price z-score
+- log-return z-score
+- volume z-score
+- rolling price standard deviation
+- rolling volume standard deviation
 
-Les résultats montrent que le système est capable d’identifier efficacement
-des comportements atypiques, tout en maintenant un nombre raisonnable
-de faux positifs.
+These features are chosen for their interpretability and relevance in an
+anomaly detection context.
 
 ---
 
-## 10. Limites et perspectives
+## 6. Anomaly Detection with Machine Learning
 
-Les principales limites actuelles sont :
-- l’utilisation de données simulées,
-- l’absence de ré-entraînement automatique,
-- un nombre limité de modèles testés.
+The project adopts an unsupervised approach, which is more realistic in a
+financial context where anomalies are rare and poorly defined.
 
-Les perspectives incluent :
-- l’ingestion de données réelles,
-- l’ajout de nouveaux modèles,
-- le déploiement dans un environnement cloud.
+The primary model used is the Isolation Forest, chosen for:
+- its robustness,
+- its speed,
+- its suitability for general anomaly detection.
+
+Training is performed in batch, while inference is carried out in real time.
+
+---
+
+## 7. API and Visualization
+
+The Machine Learning model is exposed via a FastAPI service, enabling simple
+integration with the other system components.
+
+The API provides endpoints for:
+- anomaly prediction on feature vectors,
+- prediction history retrieval,
+- system-wide service health monitoring,
+- aggregated prediction statistics,
+- loaded model parameters and metadata.
+
+A Streamlit dashboard provides a command center with four pages: system
+status monitoring, live anomaly feed, analytics with data export, and
+manual testing with presets.
+
+---
+
+## 8. Deployment and Reproducibility
+
+The entire platform is containerized with Docker and orchestrated via
+Docker Compose.
+
+A single command launches the complete system, ensuring full
+reproducibility.
+
+---
+
+## 9. Results and Evaluation
+
+Evaluation relies on injecting known anomalies into simulated data.
+
+Results show that the system is capable of effectively identifying atypical
+behavior while maintaining a reasonable number of false positives.
+
+---
+
+## 10. Limitations and Future Work
+
+Current limitations include:
+- limited number of models tested,
+- no automatic retraining,
+- evaluation primarily on simulated data.
+
+Future directions include:
+- adding new models (autoencoders, DBSCAN),
+- automatic model retraining on drift detection,
+- cloud deployment.
 
 ---
 
 ## Conclusion
 
-Ce projet illustre la conception d’un système Big Data & IA complet,
-allant de l’ingestion de données en streaming à la détection d’anomalies
-et à leur visualisation.
+This project demonstrates the design of a complete Big Data & AI system,
+from streaming data ingestion to anomaly detection and visualization.

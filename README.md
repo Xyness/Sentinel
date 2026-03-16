@@ -279,8 +279,7 @@ CryptoSentinel/
 │   └── test_preprocess.py
 ├── docs/
 │   ├── report.md
-│   ├── choices-en.md
-│   └── architecture.png
+│   └── choices-en.md
 ├── docker-compose.yml          # Full orchestration (7 services)
 └── pytest.ini
 ```
