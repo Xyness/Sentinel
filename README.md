@@ -1,4 +1,4 @@
-# CryptoAnom
+# CryptoSentinel
 
 **Real-time anomaly detection on cryptocurrency markets**
 
@@ -8,7 +8,7 @@ Big Data | Streaming | Machine Learning | Finance
 
 ## Overview
 
-CryptoAnom is a Big Data platform that analyzes cryptocurrency market data streams in real time to automatically detect anomalous or suspicious behavior using unsupervised Machine Learning.
+CryptoSentinel is a Big Data platform that analyzes cryptocurrency market data streams in real time to automatically detect anomalous or suspicious behavior using unsupervised Machine Learning.
 
 The system supports both **simulated data** (with injected anomalies for evaluation) and **real market data** from Binance via WebSocket.
 
@@ -55,6 +55,7 @@ The system supports both **simulated data** (with injected anomalies for evaluat
                           +------------------+
                           |  FastAPI          |
                           |  /predict /health |
+                          |  /stats /model-info|
                           +--------+---------+
                                    |
                                    v
@@ -75,13 +76,21 @@ The system supports both **simulated data** (with injected anomalies for evaluat
 ### Run with simulated data (default)
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 ### Run with real Binance market data
 
 ```bash
-DATA_SOURCE=binance docker-compose up --build
+DATA_SOURCE=binance docker compose up --build
+```
+
+The full pipeline takes **2-3 minutes** to start (Spark needs to produce enough data, ML trains the model, then the API loads it).
+
+Follow the startup progress with:
+
+```bash
+docker compose logs -f
 ```
 
 ### Access the services
@@ -92,6 +101,55 @@ DATA_SOURCE=binance docker-compose up --build
 | API           | http://localhost:8000         |
 | API docs      | http://localhost:8000/docs    |
 | Spark UI      | http://localhost:4040         |
+
+### Stop
+
+```bash
+docker compose down          # stop all services
+docker compose down -v       # stop + delete volumes (data)
+```
+
+---
+
+## Usage
+
+### Dashboard
+
+Open http://localhost:8501. The sidebar on the left lets you navigate between 4 pages:
+
+**◉ System Status** — Shows the health of each service (API, Spark, Kafka, Zookeeper) with online/offline cards and latency. Displays the pipeline flow diagram and current model parameters.
+
+**◎ Live Feed** — Auto-refreshing anomaly monitor. Configure the symbol filter, refresh interval (3-30s) and history depth in the sidebar. Displays KPI cards, an anomaly score timeline, a gauge, and recent anomaly alerts.
+
+**■ Analytics** — Per-symbol breakdown chart, feature correlation matrix, score trend line, filterable data table and CSV export. Toggle "Anomalies only" in the sidebar to focus on detected anomalies.
+
+**▷ Manual Test** — Test anomaly detection manually. Pick a quick preset (Normal, Price Spike, Volume Spike, Flash Crash) to pre-fill the sliders, then click "Detect Anomaly" to see the result with a gauge and score.
+
+### API
+
+The API exposes these endpoints (Swagger docs at http://localhost:8000/docs):
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Anomaly prediction
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"symbol":"BTC-USDT","z_score_price":4.5,"z_score_log_return":3.8,"z_score_volume":1.5,"rolling_price_std":0.008,"rolling_volume_std":25}'
+
+# Recent predictions (with optional symbol filter)
+curl "http://localhost:8000/latest-predictions?limit=50&symbol=BTC-USDT"
+
+# Service health overview
+curl http://localhost:8000/system-status
+
+# Aggregated stats
+curl http://localhost:8000/stats
+
+# Model parameters
+curl http://localhost:8000/model-info
+```
 
 ---
 
@@ -121,8 +179,8 @@ Both modes produce events in the same format:
 
 Apache Spark Structured Streaming consumes from Kafka and computes rolling window features:
 
-- **Rolling statistics**: price mean/std, volume mean/std (1-minute tumbling windows)
-- **Technical indicators**: price z-score, volume z-score
+- **Rolling statistics**: price mean/std, log-return mean/std, volume mean/std (1-minute tumbling windows)
+- **Technical indicators**: price z-score, log-return z-score, volume z-score
 - **Division-by-zero protection**: returns 0 when standard deviation is 0
 
 Output is written as Parquet files, partitioned by symbol.
@@ -133,7 +191,7 @@ The Isolation Forest model trains on the computed features:
 
 - **Simulated data**: train/test split (80/20) with classification report
 - **Real data**: fully unsupervised training (no labels available)
-- Features: `z_score_price`, `z_score_volume`, `rolling_price_std`, `rolling_volume_std`
+- Features: `z_score_price`, `z_score_log_return`, `z_score_volume`, `rolling_price_std`, `rolling_volume_std`
 - StandardScaler normalization
 - 200 estimators, 1% contamination rate
 
@@ -143,32 +201,44 @@ FastAPI service exposing:
 
 - `POST /predict` — anomaly detection on a feature vector
 - `GET /health` — health check with model status
-- Auto-generated Swagger docs at `/docs`
+- `GET /latest-predictions` — recent prediction history with optional symbol filter
+- `GET /system-status` — health of all pipeline services
+- `GET /stats` — aggregated prediction statistics
+- `GET /model-info` — loaded model parameters and scaler values
 
 The API starts immediately and loads the model lazily once training completes.
 
 ### 5. Dashboard
 
-Streamlit interface with:
-
-- Feature input sliders for manual testing
-- Anomaly score display with alerts
-- Prediction history with metrics and charts
+Streamlit interface with 4 pages: System Status, Live Feed, Analytics, and Manual Test (see [Usage](#usage) above).
 
 ---
 
 ## Project Structure
 
 ```
-CryptoAnom/
+CryptoSentinel/
 ├── api/                        # FastAPI anomaly detection service
-│   ├── main.py                 #   API routes (/predict, /health)
+│   ├── main.py                 #   API routes
 │   ├── model_loader.py         #   Model loading with lazy init
 │   ├── schemas.py              #   Pydantic request/response models
 │   └── requirements.txt
 ├── dashboard/                  # Streamlit visualization
-│   ├── app.py                  #   Dashboard UI
+│   ├── app.py                  #   Main app with 4-page navigation
 │   ├── api_client.py           #   HTTP client for API
+│   ├── theme.py                #   Futuristic dark/neon theme
+│   ├── components/             #   UI components
+│   │   ├── header.py           #     Header with multi-service status
+│   │   ├── kpi_cards.py        #     Glassmorphism KPI cards
+│   │   ├── charts.py           #     Plotly charts
+│   │   ├── status_cards.py     #     Service status cards
+│   │   ├── pipeline_flow.py    #     Pipeline flow diagram
+│   │   └── data_table.py       #     Filterable data table
+│   ├── views/                  #   Page modules
+│   │   ├── status.py           #     System Status page
+│   │   ├── live_feed.py        #     Live Feed page
+│   │   ├── analytics.py        #     Analytics page
+│   │   └── manual_test.py      #     Manual Test page
 │   └── requirements.txt
 ├── data-generator/             # Market data producers
 │   ├── generator.py            #   Main entry (dispatches sim/real)
@@ -187,7 +257,7 @@ CryptoAnom/
 │   └── requirements.txt
 ├── spark-java/                 # Spark Structured Streaming
 │   ├── pom.xml                 #   Maven config (Spark 3.5, Kafka)
-│   └── src/main/java/com/cryptoanom/
+│   └── src/main/java/com/cryptosentinel/
 │       ├── streaming/
 │       │   └── CryptoStreamJob.java
 │       └── features/
@@ -226,7 +296,7 @@ CryptoAnom/
 | Storage            | Parquet (columnar, partitioned)                |
 | ML                 | scikit-learn (Isolation Forest)                |
 | API                | FastAPI + Uvicorn                              |
-| Dashboard          | Streamlit                                     |
+| Dashboard          | Streamlit + Plotly                             |
 | Real Data          | Binance WebSocket API                         |
 | Infrastructure     | Docker, Docker Compose                        |
 | Build              | Maven (Java), pip (Python)                    |
@@ -281,8 +351,8 @@ pytest
 Tests cover:
 - Market simulator (event structure, anomalies, log returns)
 - Binance connector (symbol mapping, message parsing, log returns)
-- Preprocessing (NaN handling, labeled/unlabeled modes)
-- API (schemas validation, endpoints, error handling)
+- Preprocessing (NaN handling, labeled/unlabeled modes, 5 features)
+- API (schemas validation, endpoints, error handling, prediction history)
 - Configuration (defaults, env overrides)
 
 ---

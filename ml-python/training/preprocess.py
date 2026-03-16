@@ -6,6 +6,7 @@ logger = logging.getLogger(__name__)
 
 FEATURE_COLUMNS = [
     "z_score_price",
+    "z_score_log_return",
     "z_score_volume",
     "rolling_price_std",
     "rolling_volume_std"

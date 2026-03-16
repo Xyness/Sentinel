@@ -6,7 +6,9 @@ COPY ml-python/ ./
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN useradd --create-home appuser
+RUN useradd --create-home appuser \
+    && mkdir -p /models \
+    && chown appuser:appuser /models
 USER appuser
 
 CMD ["python", "train_runner.py"]

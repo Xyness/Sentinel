@@ -18,6 +18,7 @@ class TestPreprocess:
             labels[0] = 1
         df = pd.DataFrame({
             "z_score_price": rng.randn(n),
+            "z_score_log_return": rng.randn(n),
             "z_score_volume": rng.randn(n),
             "rolling_price_std": np.abs(rng.randn(n)) * 0.001,
             "rolling_volume_std": np.abs(rng.randn(n)) * 10,
@@ -31,7 +32,7 @@ class TestPreprocess:
     def test_output_shape_with_labels(self):
         df = self._make_df(100, anomaly_ratio=0.05)
         X, y = preprocess(df)
-        assert X.shape == (100, 4)
+        assert X.shape == (100, 5)
         assert y is not None
         assert len(y) == 100
 
@@ -58,6 +59,7 @@ class TestPreprocess:
         """When is_anomaly column doesn't exist, y should be None."""
         df = pd.DataFrame({
             "z_score_price": np.random.randn(50),
+            "z_score_log_return": np.random.randn(50),
             "z_score_volume": np.random.randn(50),
             "rolling_price_std": np.abs(np.random.randn(50)) * 0.001,
             "rolling_volume_std": np.abs(np.random.randn(50)) * 10,
@@ -69,6 +71,7 @@ class TestPreprocess:
     def test_empty_after_dropna(self):
         df = pd.DataFrame({
             "z_score_price": [np.nan, np.nan],
+            "z_score_log_return": [np.nan, np.nan],
             "z_score_volume": [np.nan, np.nan],
             "rolling_price_std": [np.nan, np.nan],
             "rolling_volume_std": [np.nan, np.nan],

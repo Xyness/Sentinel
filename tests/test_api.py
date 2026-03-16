@@ -14,6 +14,7 @@ class TestSchemas:
         fv = FeatureVector(
             symbol="BTC-USDT",
             z_score_price=1.5,
+            z_score_log_return=0.8,
             z_score_volume=-0.3,
             rolling_price_std=0.002,
             rolling_volume_std=10.0
@@ -27,6 +28,7 @@ class TestSchemas:
             FeatureVector(
                 symbol="BTC-USDT",
                 z_score_price=1.0,
+                z_score_log_return=0.5,
                 z_score_volume=1.0,
                 rolling_price_std=-0.001,
                 rolling_volume_std=10.0
@@ -38,6 +40,7 @@ class TestSchemas:
             FeatureVector(
                 symbol="BTC-USDT",
                 z_score_price=200.0,
+                z_score_log_return=0.5,
                 z_score_volume=1.0,
                 rolling_price_std=0.001,
                 rolling_volume_std=10.0
@@ -68,7 +71,7 @@ class TestModelLoader:
         am.loaded = True
 
         with pytest.raises(ValueError, match="NaN"):
-            am.predict([1.0, float("nan"), 0.002, 10.0])
+            am.predict([1.0, float("nan"), 0.5, 0.002, 10.0])
 
     def test_predict_with_inf_raises(self):
         """Model should reject infinite inputs."""
@@ -80,7 +83,7 @@ class TestModelLoader:
         am.loaded = True
 
         with pytest.raises(ValueError, match="infinite"):
-            am.predict([1.0, float("inf"), 0.002, 10.0])
+            am.predict([1.0, float("inf"), 0.5, 0.002, 10.0])
 
     def test_predict_not_loaded_raises(self):
         """Model should raise if not loaded."""
@@ -92,7 +95,7 @@ class TestModelLoader:
         am.loaded = False
 
         with pytest.raises(RuntimeError, match="not loaded"):
-            am.predict([1.0, 1.0, 0.002, 10.0])
+            am.predict([1.0, 1.0, 0.5, 0.002, 10.0])
 
     def test_predict_returns_tuple(self):
         """Model predict should return (score, is_anomaly)."""
@@ -103,14 +106,14 @@ class TestModelLoader:
         mock_model.predict.return_value = np.array([-1])
 
         mock_scaler = MagicMock()
-        mock_scaler.transform.return_value = np.array([[1.0, 1.0, 0.002, 10.0]])
+        mock_scaler.transform.return_value = np.array([[1.0, 1.0, 0.5, 0.002, 10.0]])
 
         am = AnomalyModel.__new__(AnomalyModel)
         am.model = mock_model
         am.scaler = mock_scaler
         am.loaded = True
 
-        score, is_anomaly = am.predict([1.0, 1.0, 0.002, 10.0])
+        score, is_anomaly = am.predict([1.0, 1.0, 0.5, 0.002, 10.0])
         assert score == -0.5
         assert is_anomaly == True
 
@@ -142,6 +145,7 @@ class TestAPIEndpoints:
         payload = {
             "symbol": "BTC-USDT",
             "z_score_price": 2.0,
+            "z_score_log_return": 1.0,
             "z_score_volume": 1.5,
             "rolling_price_std": 0.003,
             "rolling_volume_std": 15.0
@@ -157,6 +161,7 @@ class TestAPIEndpoints:
         payload = {
             "symbol": "BTC-USDT",
             "z_score_price": "not_a_number",
+            "z_score_log_return": 1.0,
             "z_score_volume": 1.5,
             "rolling_price_std": 0.003,
             "rolling_volume_std": 15.0
@@ -168,3 +173,22 @@ class TestAPIEndpoints:
         payload = {"symbol": "BTC-USDT"}
         response = client.post("/predict", json=payload)
         assert response.status_code == 422
+
+    def test_latest_predictions_endpoint(self, client):
+        response = client.get("/latest-predictions")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+
+    def test_latest_predictions_with_symbol_filter(self, client):
+        # First add a prediction
+        payload = {
+            "symbol": "ETH-USDT",
+            "z_score_price": 1.0,
+            "z_score_log_return": 0.5,
+            "z_score_volume": 0.5,
+            "rolling_price_std": 0.001,
+            "rolling_volume_std": 5.0
+        }
+        client.post("/predict", json=payload)
+        response = client.get("/latest-predictions?symbol=ETH-USDT")
+        assert response.status_code == 200

@@ -1,7 +1,7 @@
-# CryptoAnom — Justification of Technical and Methodological Choices
+# CryptoSentinel — Justification of Technical and Methodological Choices
 
 This document details all the technical, methodological and architectural
-choices made in the CryptoAnom project.
+choices made in the CryptoSentinel project.
 
 The goal is to demonstrate a deep understanding of Big Data, Machine Learning
 and distributed systems challenges, as well as the ability to design
@@ -252,7 +252,7 @@ These limitations are acknowledged and clearly identified.
 
 ## Conclusion
 
-CryptoAnom illustrates the design of a complete, coherent and realistic
+CryptoSentinel illustrates the design of a complete, coherent and realistic
 Big Data & AI system, spanning from streaming data ingestion
 to anomaly detection and visualization.
 

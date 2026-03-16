@@ -16,4 +16,6 @@ USER root
 RUN mkdir -p /opt/spark-apps
 COPY --from=builder /build/target/spark-java-1.0-SNAPSHOT.jar /opt/spark-apps/app.jar
 
+ENV PATH="/opt/spark/bin:${PATH}"
+
 WORKDIR /opt/spark-apps/

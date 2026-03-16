@@ -12,12 +12,13 @@ FEATURES_PATH = os.environ.get("FEATURES_PATH", "data/features")
 
 def load_features(path=None):
     path = path or FEATURES_PATH
-    files = glob.glob(f"{path}/**/*.parquet", recursive=True)
+    all_files = glob.glob(f"{path}/**/*.parquet", recursive=True)
+    files = [f for f in all_files if os.path.getsize(f) > 0]
 
     if not files:
-        raise FileNotFoundError(f"No parquet files found in {path}")
+        raise FileNotFoundError(f"No valid parquet files found in {path}")
 
-    logger.info(f"Loading {len(files)} parquet file(s) from {path}")
+    logger.info(f"Loading {len(files)} parquet file(s) from {path} (skipped {len(all_files) - len(files)} empty)")
     dfs = [pq.read_table(f).to_pandas() for f in files]
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Loaded {len(df)} rows, {len(df.columns)} columns")

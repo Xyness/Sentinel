@@ -1,4 +1,4 @@
-# CryptoAnom  
+# CryptoSentinel  
 ## Plateforme Big Data de Détection d’Anomalies sur Marchés Crypto en Temps Réel
 
 **Auteur :** Xyness 
