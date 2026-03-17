@@ -1,4 +1,4 @@
-# CryptoSentinel Dashboard
+# Sentinel Dashboard
 
 Ce dashboard permet de visualiser les anomalies détectées par le modèle
 Isolation Forest en temps réel.

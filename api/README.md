@@ -1,4 +1,4 @@
-# CryptoSentinel – Anomaly Detection API
+# Sentinel – Anomaly Detection API
 
 Cette API fournit un service d’inférence en temps réel pour la détection
 d’anomalies sur les marchés de crypto-monnaies.

@@ -1,7 +1,7 @@
-# CryptoSentinel — Justification of Technical and Methodological Choices
+# Sentinel — Justification of Technical and Methodological Choices
 
 This document details all the technical, methodological and architectural
-choices made in the CryptoSentinel project.
+choices made in the Sentinel project.
 
 The goal is to demonstrate a deep understanding of Big Data, Machine Learning
 and distributed systems challenges, as well as the ability to design
@@ -252,7 +252,7 @@ These limitations are acknowledged and clearly identified.
 
 ## Conclusion
 
-CryptoSentinel illustrates the design of a complete, coherent and realistic
+Sentinel illustrates the design of a complete, coherent and realistic
 Big Data & AI system, spanning from streaming data ingestion
 to anomaly detection and visualization.
 

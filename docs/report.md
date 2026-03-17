@@ -1,4 +1,4 @@
-# CryptoSentinel
+# Sentinel
 ## Big Data Platform for Real-Time Anomaly Detection on Crypto Markets
 
 **Author:** Xyness

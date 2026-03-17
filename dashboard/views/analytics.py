@@ -59,6 +59,6 @@ def render():
     st.download_button(
         label="Export CSV",
         data=csv,
-        file_name="cryptosentinel_export.csv",
+        file_name="sentinel_export.csv",
         mime="text/csv",
     )

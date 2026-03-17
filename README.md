@@ -1,4 +1,4 @@
-# CryptoSentinel
+# Sentinel
 
 **Real-time anomaly detection on cryptocurrency markets**
 
@@ -8,7 +8,7 @@ Big Data | Streaming | Machine Learning | Finance
 
 ## Overview
 
-CryptoSentinel is a Big Data platform that analyzes cryptocurrency market data streams in real time to automatically detect anomalous or suspicious behavior using unsupervised Machine Learning.
+Sentinel is a Big Data platform that analyzes cryptocurrency market data streams in real time to automatically detect anomalous or suspicious behavior using unsupervised Machine Learning.
 
 The system supports both **simulated data** (with injected anomalies for evaluation) and **real market data** from Binance via WebSocket.
 
@@ -217,7 +217,7 @@ Streamlit interface with 4 pages: System Status, Live Feed, Analytics, and Manua
 ## Project Structure
 
 ```
-CryptoSentinel/
+Sentinel/
 ├── api/                        # FastAPI anomaly detection service
 │   ├── main.py                 #   API routes
 │   ├── model_loader.py         #   Model loading with lazy init
@@ -257,7 +257,7 @@ CryptoSentinel/
 │   └── requirements.txt
 ├── spark-java/                 # Spark Structured Streaming
 │   ├── pom.xml                 #   Maven config (Spark 3.5, Kafka)
-│   └── src/main/java/com/cryptosentinel/
+│   └── src/main/java/com/sentinel/
 │       ├── streaming/
 │       │   └── CryptoStreamJob.java
 │       └── features/

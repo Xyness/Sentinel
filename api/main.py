@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="CryptoSentinel - Anomaly Detection API",
+    title="Sentinel - Anomaly Detection API",
     description="Real-time anomaly detection on crypto markets",
     version="3.0"
 )

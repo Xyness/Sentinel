@@ -1,4 +1,4 @@
-name: cryptosentinel
+name: sentinel
 
 volumes:
   features-data:
@@ -87,7 +87,7 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_TOPIC=crypto-market
       - OUTPUT_PATH=/data/features
-      - CHECKPOINT_PATH=/data/checkpoints/cryptosentinel
+      - CHECKPOINT_PATH=/data/checkpoints/sentinel
     volumes:
       - features-data:/data/features
       - checkpoint-data:/data/checkpoints
@@ -98,7 +98,7 @@ services:
       - "4040:4040"
     command: >
       spark-submit
-        --class com.cryptosentinel.streaming.CryptoStreamJob
+        --class com.sentinel.streaming.CryptoStreamJob
         --master local[*]
         --conf spark.sql.streaming.stateStore.minDeltasForSnapshot=1
         --conf spark.driver.extraJavaOptions=-Dlog4j.logger.org.apache.spark.sql.execution.streaming.state=ERROR

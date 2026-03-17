@@ -5,7 +5,7 @@ from components.header import render_header
 from views import status, live_feed, analytics, manual_test
 
 st.set_page_config(
-    page_title="CryptoSentinel Dashboard",
+    page_title="Sentinel Dashboard",
     page_icon="⬡",
     layout="wide",
 )
@@ -49,7 +49,7 @@ with st.sidebar:
 
     st.divider()
     st.markdown(
-        '<p style="font-size:0.7rem; color:#6b7280;">CryptoSentinel v3.0</p>',
+        '<p style="font-size:0.7rem; color:#6b7280;">Sentinel v3.0</p>',
         unsafe_allow_html=True,
     )
 

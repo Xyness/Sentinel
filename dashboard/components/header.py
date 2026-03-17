@@ -29,7 +29,7 @@ def render_header(api_online: bool, services: list = None):
     st.markdown(f"""
     <div class="sentinel-header">
         <div>
-            <p class="sentinel-title">CryptoSentinel</p>
+            <p class="sentinel-title">Sentinel</p>
             <p class="sentinel-subtitle">Real-time Anomaly Detection Command Center</p>
         </div>
         <div style="margin-left: auto; display: flex; align-items: center; flex-wrap: wrap;">
