@@ -104,8 +104,7 @@ test(ml): add scaler normalization tests
 
 ## Reporting Issues
 
-Use the [issue templates](.github/ISSUE_TEMPLATE/) to report bugs or request features.
-
-## Code of Conduct
-
-This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold it.
+Open an issue on GitHub to report bugs or request features. Please include:
+- A clear description of the problem or suggestion
+- Steps to reproduce (for bugs)
+- Expected vs actual behavior
