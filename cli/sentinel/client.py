@@ -10,11 +10,11 @@ import httpx
 DEFAULT_API = os.environ.get("API_BASE_URL", "http://localhost:8000")
 
 FEATURE_FIELDS = (
-    "z_score_price",
-    "z_score_log_return",
-    "z_score_volume",
-    "rolling_price_std",
-    "rolling_volume_std",
+    "abs_return_max",
+    "return_std",
+    "price_range_rel",
+    "volume_max_ratio",
+    "volume_cv",
 )
 
 
@@ -23,7 +23,7 @@ class ApiError(RuntimeError):
 
 
 class Client:
-    """The API, as five calls.
+    """The API, as six calls.
 
     Nothing here swallows a failure into a default. The old dashboard returned
     empty stats when the API was down, which drew a page of zeros that looked
@@ -32,9 +32,9 @@ class Client:
     error, because reporting the outage is its job.
     """
 
-    # /system-status probes Spark, Kafka and Zookeeper one after another with
-    # its own timeouts, which comes to about seven seconds when all three are
-    # down. Ten leaves no margin for the outage it exists to report.
+    # /system-status probes Spark and Kafka at the same time now, so a stack
+    # that is entirely down answers in the longest single timeout rather than
+    # the sum of them. Twenty still leaves room for a slow driver.
     def __init__(self, base_url: str = DEFAULT_API, timeout: float = 20.0, transport=None):
         self.base_url = base_url.rstrip("/")
         self._http = httpx.Client(base_url=self.base_url, timeout=timeout, transport=transport)

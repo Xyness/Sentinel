@@ -2,11 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY api/ ./
-
+# Requirements first, so editing a source file does not reinstall scikit-learn.
+COPY api/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN useradd --create-home appuser
+COPY api/ ./
+
+# The predictions volume mounts here. Docker seeds an empty named volume from
+# the image's directory, ownership included, so creating it as appuser now is
+# what lets a non-root API write to it later.
+RUN useradd --create-home appuser \
+    && mkdir -p /data/predictions \
+    && chown -R appuser:appuser /data/predictions
 USER appuser
 
 EXPOSE 8000

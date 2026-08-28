@@ -33,12 +33,14 @@ STATUS_MARK = {"online": "+", "degraded": "~", "offline": "!", "unchecked": "?"}
 # model file, which the block under the pipeline reports on instead.
 PIPELINE = ("generator", "kafka", "spark", "scorer", "api")
 
+# The five the model is fitted on, in the order the API sends them, with the
+# labels that fit a narrow terminal. All dimensionless, all with a floor of 0.
 FEATURES = (
-    ("z_score_price", "z price"),
-    ("z_score_log_return", "z return"),
-    ("z_score_volume", "z volume"),
-    ("rolling_price_std", "price std"),
-    ("rolling_volume_std", "volume std"),
+    ("abs_return_max", "max return"),
+    ("return_std", "volatility"),
+    ("price_range_rel", "price range"),
+    ("volume_max_ratio", "volume peak"),
+    ("volume_cv", "volume cv"),
 )
 
 
@@ -255,6 +257,29 @@ def model_table(info: dict, details: bool = False) -> Table:
             stamp.append(f"   trained {modified}", style="bright_black")
         grid.add_row("file", stamp)
 
+    # What the training run measured on rows it had not fitted on. The model
+    # carries it, so the client can print it without going near the training
+    # logs, and a number nobody can find is a number nobody trusts.
+    metrics = info.get("metrics") or {}
+    if metrics.get("n_train"):
+        fitted = Text(f"{metrics['n_train']:,} rows", style="white")
+        if metrics.get("label_rate") is not None:
+            fitted.append(f"  {metrics['label_rate'] * 100:.1f} % labelled anomalous",
+                          style="bright_black")
+        grid.add_row("fitted on", fitted)
+
+    holdout = metrics.get("holdout")
+    if holdout:
+        grid.add_row("holdout", Text(
+            f"precision {holdout['precision']:.3f}   "
+            f"recall {holdout['recall']:.3f}   "
+            f"f1 {holdout['f1']:.3f}", style="white"))
+        grid.add_row("", Text(f"over {holdout['support']} labelled anomalies",
+                              style="bright_black"))
+    elif metrics.get("labelled") is False:
+        grid.add_row("holdout", Text("unlabelled data, nothing to score against",
+                                     style="bright_black"))
+
     if details and info.get("scaler_means"):
         names = [label for _, label in FEATURES]
         for name, mean, deviation in zip(names, info["scaler_means"],
@@ -408,11 +433,13 @@ def feed_line(item: dict) -> Text:
                 style="bold red" if flagged else "white")
     line.append(f"{'anomaly' if flagged else 'normal':<8}",
                 style="bold red" if flagged else "green")
-    line.append("  z ", style="bright_black")
+    # The three that carry most of a verdict. The other two are in `predict`
+    # and in `stats`, where there is room for all five.
+    line.append("  ret ", style="bright_black")
     line.append(
-        f"{item.get('z_score_price', 0.0):+6.2f} "
-        f"{item.get('z_score_log_return', 0.0):+6.2f} "
-        f"{item.get('z_score_volume', 0.0):+6.2f}",
+        f"{item.get('abs_return_max', 0.0):7.4f} "
+        f"{item.get('price_range_rel', 0.0):7.4f} "
+        f"{item.get('volume_max_ratio', 0.0):6.2f}",
         style="bright_black",
     )
     return line

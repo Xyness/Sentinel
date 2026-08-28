@@ -34,27 +34,32 @@ SERVICES = [
     {"name": "API", "status": "online", "response_time_ms": 0.0, "details": None},
     {"name": "Spark", "status": "online", "response_time_ms": 41.2, "details": None},
     {"name": "Kafka", "status": "online", "response_time_ms": 1.8, "details": None},
-    {"name": "Zookeeper", "status": "online", "response_time_ms": 1.1, "details": None},
 ]
 
+# Deliberately a Binance run, so the capture shows the shape of the scorecard
+# without putting a precision and a recall in the README that no run produced.
+# The real ones come off `sentinel status` once the stack has been up on
+# simulated data, and they belong in prose where they can be dated.
 MODEL = {
     "loaded": True,
     "model_type": "IsolationForest",
     "n_estimators": 200,
-    "contamination": 0.01,
+    "contamination": 0.05,
     "max_samples": "auto",
     "model_file_size_kb": 428.5,
     "model_file_modified": "2026-08-27T09:41:02+00:00",
+    "metrics": {"n_train": 1840, "labelled": False, "holdout": None},
 }
 
-# symbol, score, flagged, the three z-scores
+# symbol, score, flagged, then the three the feed prints: the largest absolute
+# log return, the relative price range, and the biggest trade over the average
 FEED = [
-    ("BTC-USDT", 0.1442, False, (-1.57, 0.36, 0.82)),
-    ("ETH-USDT", 0.1305, False, (0.04, -1.16, 1.32)),
-    ("BNB-USDT", 0.0553, False, (1.09, -0.36, 0.15)),
-    ("BTC-USDT", -0.1286, True, (4.50, 3.80, 1.50)),
-    ("ETH-USDT", 0.1626, False, (0.26, 0.68, 0.85)),
-    ("BTC-USDT", -0.0124, True, (-7.11, -0.51, 5.86)),
+    ("BTC-USDT", 0.1442, False, (0.0012, 0.0035, 1.82)),
+    ("ETH-USDT", 0.1305, False, (0.0009, 0.0028, 2.14)),
+    ("BNB-USDT", 0.0553, False, (0.0021, 0.0044, 1.63)),
+    ("BTC-USDT", -0.1286, True, (0.1150, 0.1240, 4.21)),
+    ("ETH-USDT", 0.1626, False, (0.0014, 0.0031, 1.95)),
+    ("BTC-USDT", -0.0124, True, (0.0018, 0.0041, 9.47)),
 ]
 
 
@@ -64,15 +69,15 @@ def feed_items() -> list[dict]:
             "id": number,
             "timestamp": f"2026-08-27T10:14:{40 + number * 3:02d}+00:00",
             "symbol": symbol,
-            "z_score_price": price,
-            "z_score_log_return": log_return,
-            "z_score_volume": volume,
-            "rolling_price_std": 0.0031,
-            "rolling_volume_std": 12.4,
+            "abs_return_max": abs_return,
+            "price_range_rel": price_range,
+            "volume_max_ratio": volume_peak,
+            "return_std": 0.0008,
+            "volume_cv": 0.37,
             "anomaly_score": score,
             "is_anomaly": flagged,
         }
-        for number, (symbol, score, flagged, (price, log_return, volume))
+        for number, (symbol, score, flagged, (abs_return, price_range, volume_peak))
         in enumerate(FEED, start=1)
     ]
 

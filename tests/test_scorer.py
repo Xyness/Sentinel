@@ -1,5 +1,6 @@
 """The scorer: what it reads off disk, and what it sends on."""
 
+import json
 import os
 import sys
 
@@ -13,11 +14,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scorer"))
 import scorer  # noqa: E402
 
 ROWS = {
-    "z_score_price": [4.5, 0.1],
-    "z_score_log_return": [3.8, 0.05],
-    "z_score_volume": [1.5, 0.2],
-    "rolling_price_std": [0.008, 0.002],
-    "rolling_volume_std": [25.0, 10.0],
+    "abs_return_max": [0.1150, 0.0012],
+    "return_std": [0.0210, 0.0008],
+    "price_range_rel": [0.1240, 0.0035],
+    "volume_max_ratio": [4.2, 1.8],
+    "volume_cv": [1.30, 0.35],
 }
 
 
@@ -40,9 +41,13 @@ def _client(handler):
     return httpx.Client(base_url="http://api:8000", transport=httpx.MockTransport(handler))
 
 
-def _ok(request):
-    return httpx.Response(200, json={"symbol": "BTC-USDT", "anomaly_score": -0.2,
-                                     "is_anomaly": True})
+def _scores(request):
+    """Answer a batch with one result per vector, in the order they came."""
+    vectors = json.loads(request.content)["vectors"]
+    return httpx.Response(200, json=[
+        {"symbol": vector["symbol"], "anomaly_score": -0.2, "is_anomaly": True}
+        for vector in vectors
+    ])
 
 
 # --- reading what Spark wrote ----------------------------------------------
@@ -61,7 +66,7 @@ def test_a_file_outside_a_symbol_partition_is_skipped(features):
 
 
 def test_rows_with_a_null_in_them_never_reach_the_api(features):
-    holed = {**ROWS, "z_score_volume": [1.5, None]}
+    holed = {**ROWS, "price_range_rel": [0.1240, None]}
     assert len(scorer.rows_in(_parquet(features, rows=holed))) == 1
 
 
@@ -85,11 +90,36 @@ def test_every_row_becomes_one_prediction(features):
 
     def handler(request):
         sent.append(request)
-        return _ok(request)
+        return _scores(request)
 
     count, anomalies = scorer.score(_client(handler), scorer.rows_in(_parquet(features)))
-    assert (count, anomalies, len(sent)) == (2, 2, 2)
-    assert all(r.url.path == "/predict" for r in sent)
+    assert (count, anomalies) == (2, 2)
+    assert all(r.url.path == "/predict/batch" for r in sent)
+
+
+def test_a_whole_file_goes_out_in_one_call(features):
+    """It used to be a round trip and a single-row scaler call per row."""
+    sent = []
+
+    def handler(request):
+        sent.append(request)
+        return _scores(request)
+
+    scorer.score(_client(handler), scorer.rows_in(_parquet(features)))
+    assert len(sent) == 1
+    assert len(json.loads(sent[0].content)["vectors"]) == 2
+
+
+def test_a_backlog_is_split_into_batches(features, monkeypatch):
+    monkeypatch.setattr(scorer, "BATCH_SIZE", 1)
+    sent = []
+
+    def handler(request):
+        sent.append(request)
+        return _scores(request)
+
+    count, _ = scorer.score(_client(handler), scorer.rows_in(_parquet(features)))
+    assert (count, len(sent)) == (2, 2)
 
 
 def test_a_cold_model_is_waited_for_rather_than_dropped(features):
@@ -104,9 +134,16 @@ def test_only_the_five_features_and_the_symbol_go_out(features):
     seen = {}
 
     def handler(request):
-        import json
-        seen.update(json.loads(request.content))
-        return _ok(request)
+        for vector in json.loads(request.content)["vectors"]:
+            seen.update(vector)
+        return _scores(request)
 
     scorer.score(_client(handler), scorer.rows_in(_parquet(features)))
     assert set(seen) == {"symbol", *scorer.FEATURE_COLUMNS}
+
+
+def test_nothing_to_send_is_not_a_call(features):
+    def handler(request):
+        raise AssertionError("should not have been called")
+
+    assert scorer.score(_client(handler), []) == (0, 0)

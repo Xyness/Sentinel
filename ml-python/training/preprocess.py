@@ -5,16 +5,30 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
+# The contract with FeatureAssembler.java, the scorer and the API schema. All
+# five are dimensionless, so a row from BTC and a row from BNB are comparable
+# and the model spends itself on anomalies rather than on telling pairs apart.
 FEATURE_COLUMNS = [
-    "z_score_price",
-    "z_score_log_return",
-    "z_score_volume",
-    "rolling_price_std",
-    "rolling_volume_std"
+    "abs_return_max",
+    "return_std",
+    "price_range_rel",
+    "volume_max_ratio",
+    "volume_cv",
 ]
 
 
 def preprocess(df: pd.DataFrame):
+    missing = [column for column in FEATURE_COLUMNS if column not in df.columns]
+    if missing:
+        # The feature set is written down in Java, here and in the API schema,
+        # and they only meet through Parquet on a shared volume. Say which one
+        # drifted rather than dying on a KeyError three frames down.
+        raise KeyError(
+            f"the feature store is missing {', '.join(missing)}. "
+            f"Expected {FEATURE_COLUMNS}, found {list(df.columns)}. "
+            f"FeatureAssembler.java and this list have to agree."
+        )
+
     initial_len = len(df)
     drop_cols = FEATURE_COLUMNS + (["is_anomaly"] if "is_anomaly" in df.columns else [])
     df = df.dropna(subset=drop_cols)

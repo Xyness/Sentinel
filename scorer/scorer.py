@@ -22,13 +22,17 @@ API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
 FEATURES_PATH = os.environ.get("FEATURES_PATH", "data/features")
 INTERVAL_SECONDS = int(os.environ.get("SCORE_INTERVAL_SECONDS", "15"))
 
+# The contract with FeatureAssembler.java, preprocess.py and the API schema.
 FEATURE_COLUMNS = [
-    "z_score_price",
-    "z_score_log_return",
-    "z_score_volume",
-    "rolling_price_std",
-    "rolling_volume_std",
+    "abs_return_max",
+    "return_std",
+    "price_range_rel",
+    "volume_max_ratio",
+    "volume_cv",
 ]
+
+# What /predict/batch will take in one call.
+BATCH_SIZE = 500
 
 
 class ModelNotReady(Exception):
@@ -84,14 +88,19 @@ def pending(seen):
 
 
 def score(client, vectors):
-    """POST each vector, and count what came back flagged."""
+    """POST the file's rows, and count what came back flagged.
+
+    One call per batch rather than one per row. The API answers with the
+    results in the order they were sent, so nothing has to be matched back up.
+    """
     anomalies = 0
-    for vector in vectors:
-        response = client.post("/predict", json=vector)
+    for start in range(0, len(vectors), BATCH_SIZE):
+        chunk = vectors[start:start + BATCH_SIZE]
+        response = client.post("/predict/batch", json={"vectors": chunk})
         if response.status_code == 503:
             raise ModelNotReady(response.json().get("detail", "no model loaded"))
         response.raise_for_status()
-        anomalies += bool(response.json().get("is_anomaly"))
+        anomalies += sum(1 for result in response.json() if result.get("is_anomaly"))
     return len(vectors), anomalies
 
 
@@ -99,8 +108,8 @@ def main():
     logger.info(f"Scorer starting: {FEATURES_PATH} -> {API_BASE_URL}, every {INTERVAL_SECONDS}s")
 
     # Files already on disk are sent too. Remembering a cursor across restarts
-    # would need a writable volume, and all it would protect is a 500-entry ring
-    # buffer, so a restart replaying what is still there is the cheaper trade.
+    # would need a writable volume, and the predictions themselves are in the
+    # API's database now, so a replay costs duplicate rows rather than a gap.
     seen = set()
     total = flagged = 0
 
@@ -118,8 +127,8 @@ def main():
 
                 # Marked only once the whole file landed. One interrupted
                 # halfway is sent again from the start, which can duplicate the
-                # rows that did land; at three rows a minute into a ring buffer
-                # that beats tracking an offset per file.
+                # rows that did land; at three rows a minute that beats
+                # tracking an offset per file.
                 seen.add(path)
                 total += sent
                 flagged += anomalies

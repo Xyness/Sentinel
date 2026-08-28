@@ -2,12 +2,38 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class FeatureVector(BaseModel):
+    """One window of one pair, as five dimensionless numbers.
+
+    They are ratios rather than z-scores against the window's own deviation.
+    That old shape hid the thing it was meant to measure: an anomaly inflates
+    the deviation used to normalise it, so the score of a step depended on
+    where in the window it landed and not on how big it was.
+
+    Every field has a floor of zero because every one of them is a magnitude,
+    and a ceiling loose enough to admit any real market and tight enough to
+    catch a unit mix-up before it reaches the scaler.
+    """
+
     symbol: str = Field(..., description="Cryptocurrency pair (e.g. BTC-USDT)")
-    z_score_price: float = Field(..., ge=-100, le=100, description="Price z-score")
-    z_score_log_return: float = Field(..., ge=-100, le=100, description="Log-return z-score")
-    z_score_volume: float = Field(..., ge=-100, le=100, description="Volume z-score")
-    rolling_price_std: float = Field(..., ge=0, description="Rolling price standard deviation")
-    rolling_volume_std: float = Field(..., ge=0, description="Rolling volume standard deviation")
+    abs_return_max: float = Field(
+        ..., ge=0, le=10,
+        description="Largest absolute log return in the window")
+    return_std: float = Field(
+        ..., ge=0, le=10,
+        description="Realised volatility: standard deviation of log returns")
+    price_range_rel: float = Field(
+        ..., ge=0, le=100,
+        description="(high - low) / mean price over the window")
+    volume_max_ratio: float = Field(
+        ..., ge=0, le=10000,
+        description="Largest single trade over the window's mean volume")
+    volume_cv: float = Field(
+        ..., ge=0, le=1000,
+        description="Volume standard deviation over mean volume")
+
+
+class FeatureBatch(BaseModel):
+    vectors: list[FeatureVector] = Field(..., min_length=1, max_length=500)
 
 
 class PredictionResult(BaseModel):
@@ -20,11 +46,11 @@ class PredictionHistoryItem(BaseModel):
     id: int
     timestamp: str
     symbol: str
-    z_score_price: float
-    z_score_log_return: float
-    z_score_volume: float
-    rolling_price_std: float
-    rolling_volume_std: float
+    abs_return_max: float
+    return_std: float
+    price_range_rel: float
+    volume_max_ratio: float
+    volume_cv: float
     anomaly_score: float
     is_anomaly: bool
 
@@ -81,6 +107,27 @@ class StatsResponse(BaseModel):
     per_symbol: dict[str, SymbolStats]
     score_percentiles: ScorePercentiles | None = None
     feature_stats: dict[str, FeatureStat] | None = None
+    stored: int | None = None
+
+
+class HoldoutScores(BaseModel):
+    """What the training run measured on rows it had not fitted on."""
+
+    precision: float
+    recall: float
+    f1: float
+    support: int
+
+
+class ModelMetrics(BaseModel):
+    trained_at: str | None = None
+    n_rows: int | None = None
+    n_train: int | None = None
+    n_test: int | None = None
+    contamination: float | None = None
+    labelled: bool | None = None
+    label_rate: float | None = None
+    holdout: HoldoutScores | None = None
 
 
 class ModelInfoResponse(BaseModel):
@@ -99,3 +146,4 @@ class ModelInfoResponse(BaseModel):
     scaler_stds: list[float] | None = None
     model_file_size_kb: float | None = None
     model_file_modified: str | None = None
+    metrics: ModelMetrics | None = None

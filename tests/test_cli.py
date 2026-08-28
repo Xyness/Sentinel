@@ -20,11 +20,11 @@ def _item(number=1, symbol="BTC-USDT", score=-0.18, anomaly=True):
         "id": number,
         "timestamp": f"2026-08-27T10:00:{number:02d}+00:00",
         "symbol": symbol,
-        "z_score_price": 4.5,
-        "z_score_log_return": 3.8,
-        "z_score_volume": 1.5,
-        "rolling_price_std": 0.008,
-        "rolling_volume_std": 25.0,
+        "abs_return_max": 0.1150,
+        "return_std": 0.0210,
+        "price_range_rel": 0.1240,
+        "volume_max_ratio": 4.2,
+        "volume_cv": 1.30,
         "anomaly_score": score,
         "is_anomaly": anomaly,
     }
@@ -97,22 +97,22 @@ def test_client_says_where_it_could_not_reach():
 
 
 def test_preset_fills_the_vector_and_flags_beat_it():
-    args = _args("predict", ["--preset", "flash-crash", "--z-volume", "0.25"])
+    args = _args("predict", ["--preset", "flash-crash", "--volume-peak", "0.25"])
     features = cli._features(args)
-    assert features["z_score_price"] == pytest.approx(-4.2)
-    assert features["z_score_volume"] == pytest.approx(0.25)
+    assert features["abs_return_max"] == pytest.approx(0.1150)
+    assert features["volume_max_ratio"] == pytest.approx(0.25)
 
 
 def test_a_half_given_vector_is_an_error_rather_than_zeros():
-    args = _args("predict", ["--z-price", "4.5"])
-    with pytest.raises(ValueError, match="rolling_volume_std"):
+    args = _args("predict", ["--max-return", "0.115"])
+    with pytest.raises(ValueError, match="volume_cv"):
         cli._features(args)
 
 
 def test_stdin_beats_the_preset():
     args = _args("predict", ["--preset", "normal"])
-    features = cli._features(args, overrides={"z_score_price": 9.9, "symbol": "ETH-USDT"})
-    assert features["z_score_price"] == pytest.approx(9.9)
+    features = cli._features(args, overrides={"abs_return_max": 0.99, "symbol": "ETH-USDT"})
+    assert features["abs_return_max"] == pytest.approx(0.99)
     assert features["symbol"] == "ETH-USDT"
 
 
@@ -143,6 +143,43 @@ def test_status_says_a_cold_model_is_not_a_failure(api):
     console = _console()
     assert cli.cmd_status(_args("status", []), console) == cli.EXIT_OK
     assert "training may still be running" in console.file.getvalue()
+
+
+def test_status_prints_the_scorecard_the_model_carries(api):
+    """The whole point of the bundle carrying its own metrics: the number is
+    one command away instead of buried in a training log nobody kept."""
+    api.routes["/health"] = {"status": "ok", "model_loaded": True}
+    api.routes["/system-status"] = {"services": [], "timestamp": ""}
+    api.routes["/model-info"] = {
+        "loaded": True, "model_type": "IsolationForest", "n_estimators": 200,
+        "contamination": 0.05, "max_samples": "auto",
+        "metrics": {"n_train": 1600, "label_rate": 0.048,
+                    "holdout": {"precision": 0.81, "recall": 0.74, "f1": 0.77,
+                                "support": 19}},
+    }
+
+    console = _console()
+    assert cli.cmd_status(_args("status", []), console) == cli.EXIT_OK
+    output = console.file.getvalue()
+
+    assert "1,600 rows" in output
+    assert "precision 0.810" in output
+    assert "recall 0.740" in output
+    assert "19 labelled anomalies" in output
+
+
+def test_status_says_so_when_there_was_nothing_to_score_against(api):
+    api.routes["/health"] = {"status": "ok", "model_loaded": True}
+    api.routes["/system-status"] = {"services": [], "timestamp": ""}
+    api.routes["/model-info"] = {
+        "loaded": True, "model_type": "IsolationForest", "n_estimators": 200,
+        "contamination": 0.05, "max_samples": "auto",
+        "metrics": {"n_train": 900, "labelled": False, "holdout": None},
+    }
+
+    console = _console()
+    cli.cmd_status(_args("status", []), console)
+    assert "nothing to score against" in console.file.getvalue()
 
 
 def test_unreachable_stages_are_drawn_unchecked_not_green():
@@ -203,7 +240,7 @@ def test_a_filter_that_matched_nothing_is_not_an_empty_pipeline(api):
 def test_feed_line_columns_line_up():
     lines = [_text(render.feed_line(_item(1, "BTC-USDT", -0.1832, True))).rstrip("\n"),
              _text(render.feed_line(_item(2, "ETH-USDT", 0.0741, False))).rstrip("\n")]
-    assert lines[0].index("z ") == lines[1].index("z ")
+    assert lines[0].index("ret ") == lines[1].index("ret ")
 
 
 # --- stats ------------------------------------------------------------------
@@ -221,7 +258,7 @@ def test_narrowing_to_one_symbol_drops_the_figures_computed_across_all(api):
         "per_symbol": {"BTC-USDT": {"count": 6, "anomalies": 1, "anomaly_rate": 16.67,
                                     "avg_score": -0.05}},
         "score_percentiles": {"p50": -0.1},
-        "feature_stats": {"z_score_price": {"mean": 1.0}},
+        "feature_stats": {"abs_return_max": {"mean": 0.001}},
     }, "BTC-USDT")
 
     assert stats["total_predictions"] == 6

@@ -10,11 +10,17 @@ jobs:
   python:
     name: Python Tests
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The README says 3.11+ and the images are built on 3.11, so both ends
+        # of that claim get tested rather than only the one CI happened to pick.
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: tests/requirements.txt
       - name: Install dependencies
@@ -41,13 +47,44 @@ jobs:
         working-directory: spark-java
         run: mvn -B package -DskipTests
 
-  docker:
-    name: Docker Build
+  e2e:
+    name: End to end
     runs-on: ubuntu-latest
     needs: [python, spark]
+    timeout-minutes: 30
+    env:
+      # Twenty-second windows instead of one-minute ones, and five events a
+      # second instead of one, so a window closes in twenty seconds and the
+      # whole pipeline can be watched inside a CI run. The arithmetic is the
+      # same, there is just less waiting.
+      WINDOW_DURATION: 20 seconds
+      EVENT_FREQUENCY_SECONDS: "0.2"
+      ANOMALY_PROBABILITY: "0.0005"
+      MIN_EVENTS_PER_WINDOW: "10"
+      MIN_PARQUET_FILES: "2"
+      SCORE_INTERVAL_SECONDS: "5"
+      RETRAIN_INTERVAL_SECONDS: "0"
+      SMOKE_TIMEOUT_SECONDS: "600"
     steps:
       - uses: actions/checkout@v4
+
       - name: Validate compose file
         run: docker compose config --quiet
-      - name: Build all service images
-        run: docker compose build
+
+      - name: Bring the stack up
+        run: docker compose up -d --build
+
+      - name: Wait for a prediction to come out the far end
+        run: python scripts/smoke_test.py
+
+      - name: What training had to say
+        if: always()
+        run: docker compose logs ml-training --tail 60
+
+      - name: Logs
+        if: failure()
+        run: docker compose logs --tail 120
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

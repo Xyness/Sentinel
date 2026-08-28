@@ -12,6 +12,8 @@ public class CryptoStreamJob {
     private static final String DEFAULT_KAFKA_TOPIC = "crypto-market";
     private static final String DEFAULT_OUTPUT_PATH = "data/features";
     private static final String DEFAULT_CHECKPOINT_PATH = "data/checkpoints/sentinel";
+    private static final String DEFAULT_WINDOW_DURATION = "1 minute";
+    private static final String DEFAULT_MIN_EVENTS = "10";
 
     public static void main(String[] args) throws Exception {
 
@@ -19,6 +21,9 @@ public class CryptoStreamJob {
         String kafkaTopic = System.getenv().getOrDefault("KAFKA_TOPIC", DEFAULT_KAFKA_TOPIC);
         String outputPath = System.getenv().getOrDefault("OUTPUT_PATH", DEFAULT_OUTPUT_PATH);
         String checkpointPath = System.getenv().getOrDefault("CHECKPOINT_PATH", DEFAULT_CHECKPOINT_PATH);
+        String windowDuration = System.getenv().getOrDefault("WINDOW_DURATION", DEFAULT_WINDOW_DURATION);
+        int minEvents = Integer.parseInt(
+                System.getenv().getOrDefault("MIN_EVENTS_PER_WINDOW", DEFAULT_MIN_EVENTS));
 
         SparkSession spark = SparkSession.builder()
                 .appName("Sentinel-Streaming")
@@ -49,10 +54,14 @@ public class CryptoStreamJob {
                 .withColumn("event_time",
                         to_timestamp(from_unixtime(col("timestamp"))));
 
+        // One window of slack for events that arrive out of order. Longer than
+        // the window and a closed window would still be waiting on stragglers
+        // before anything downstream sees it, which is latency nobody asked for.
         Dataset<Row> withWatermark = marketStream
-                .withWatermark("event_time", "1 minute");
+                .withWatermark("event_time", windowDuration);
 
-        Dataset<Row> featureStream = FeatureAssembler.buildFeatures(withWatermark);
+        Dataset<Row> featureStream =
+                FeatureAssembler.buildFeatures(withWatermark, windowDuration, minEvents);
 
         StreamingQuery query = featureStream.writeStream()
                 .format("parquet")

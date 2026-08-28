@@ -14,7 +14,7 @@ That puts a `sentinel` command on your path.
 ```bash
 sentinel status                                # what is up, and what the model looks like
 sentinel feed                                  # follow predictions as they land
-sentinel stats                                 # the buffer, aggregated
+sentinel stats                                 # what has been scored, aggregated
 sentinel predict --preset flash-crash          # score a feature vector by hand
 sentinel export -f csv -o predictions.csv      # the buffer as a file
 sentinel version
@@ -29,7 +29,7 @@ rendered view.
 ```
 sentinel/
   cli.py        command surface
-  client.py     the API, as five calls
+  client.py     the API, as six calls
   render.py     everything the terminal prints
 ```
 

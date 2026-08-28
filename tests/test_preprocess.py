@@ -1,11 +1,24 @@
-import sys
 import os
-import pandas as pd
+import sys
+
 import numpy as np
+import pandas as pd
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "ml-python", "training"))
 
-from preprocess import preprocess, FEATURE_COLUMNS
+from preprocess import FEATURE_COLUMNS, preprocess
+
+
+def _features(n, rng):
+    """A frame of plausible feature values. All five have a floor of zero."""
+    return {
+        "abs_return_max": np.abs(rng.randn(n)) * 0.002,
+        "return_std": np.abs(rng.randn(n)) * 0.001,
+        "price_range_rel": np.abs(rng.randn(n)) * 0.004,
+        "volume_max_ratio": 1 + np.abs(rng.randn(n)),
+        "volume_cv": np.abs(rng.randn(n)) * 0.4,
+    }
 
 
 class TestPreprocess:
@@ -15,17 +28,10 @@ class TestPreprocess:
         labels = rng.choice([0, 1], size=n, p=[1 - anomaly_ratio, anomaly_ratio])
         if anomaly_ratio > 0 and labels.sum() == 0:
             labels[0] = 1
-        df = pd.DataFrame({
-            "z_score_price": rng.randn(n),
-            "z_score_log_return": rng.randn(n),
-            "z_score_volume": rng.randn(n),
-            "rolling_price_std": np.abs(rng.randn(n)) * 0.001,
-            "rolling_volume_std": np.abs(rng.randn(n)) * 10,
-            "is_anomaly": labels,
-        })
+        df = pd.DataFrame({**_features(n, rng), "is_anomaly": labels})
         if nan_count > 0:
             idx = np.random.choice(n, nan_count, replace=False)
-            df.loc[idx, "z_score_price"] = np.nan
+            df.loc[idx, "abs_return_max"] = np.nan
         return df
 
     def test_output_shape_with_labels(self):
@@ -56,25 +62,22 @@ class TestPreprocess:
 
     def test_missing_is_anomaly_column(self):
         """When is_anomaly column doesn't exist, y should be None."""
-        df = pd.DataFrame({
-            "z_score_price": np.random.randn(50),
-            "z_score_log_return": np.random.randn(50),
-            "z_score_volume": np.random.randn(50),
-            "rolling_price_std": np.abs(np.random.randn(50)) * 0.001,
-            "rolling_volume_std": np.abs(np.random.randn(50)) * 10,
-        })
+        df = pd.DataFrame(_features(50, np.random.RandomState(0)))
         X, y = preprocess(df)
         assert len(X) == 50
         assert y is None
 
     def test_empty_after_dropna(self):
-        df = pd.DataFrame({
-            "z_score_price": [np.nan, np.nan],
-            "z_score_log_return": [np.nan, np.nan],
-            "z_score_volume": [np.nan, np.nan],
-            "rolling_price_std": [np.nan, np.nan],
-            "rolling_volume_std": [np.nan, np.nan],
-            "is_anomaly": [0, 1],
-        })
+        df = pd.DataFrame({**{name: [np.nan, np.nan] for name in FEATURE_COLUMNS},
+                           "is_anomaly": [0, 1]})
         X, y = preprocess(df)
         assert len(X) == 0
+
+    def test_a_feature_store_from_an_older_job_says_so(self):
+        """The feature set lives in Java, here and in the API schema, and they
+        only meet through Parquet. A drift used to surface as a KeyError three
+        frames down at inference time."""
+        stale = pd.DataFrame({"z_score_price": [1.0], "rolling_volume_std": [2.0]})
+
+        with pytest.raises(KeyError, match="FeatureAssembler.java"):
+            preprocess(stale)

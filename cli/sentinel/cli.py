@@ -23,29 +23,31 @@ EXIT_INTERRUPTED = 130
 SYMBOLS = ("BTC-USDT", "ETH-USDT", "BNB-USDT")
 
 # The same four shapes the manual test page offered, kept because they are the
-# quickest way to find out where the decision boundary sits.
+# quickest way to find out where the decision boundary sits. The numbers are
+# what a minute of the simulator actually produces: a quiet BTC minute moves
+# about a tenth of a percent, and the injected spike is 5 to 15 %.
 PRESETS = {
     "normal": {
-        "z_score_price": 0.1, "z_score_log_return": 0.05, "z_score_volume": 0.2,
-        "rolling_price_std": 0.002, "rolling_volume_std": 10.0,
+        "abs_return_max": 0.0012, "return_std": 0.0008, "price_range_rel": 0.0035,
+        "volume_max_ratio": 1.8, "volume_cv": 0.35,
     },
     "price-spike": {
-        "z_score_price": 4.5, "z_score_log_return": 3.8, "z_score_volume": 1.5,
-        "rolling_price_std": 0.008, "rolling_volume_std": 25.0,
+        "abs_return_max": 0.0620, "return_std": 0.0110, "price_range_rel": 0.0680,
+        "volume_max_ratio": 2.4, "volume_cv": 0.45,
     },
     "volume-spike": {
-        "z_score_price": 0.5, "z_score_log_return": 0.3, "z_score_volume": 4.8,
-        "rolling_price_std": 0.003, "rolling_volume_std": 45.0,
+        "abs_return_max": 0.0015, "return_std": 0.0009, "price_range_rel": 0.0040,
+        "volume_max_ratio": 9.5, "volume_cv": 2.10,
     },
     "flash-crash": {
-        "z_score_price": -4.2, "z_score_log_return": -4.5, "z_score_volume": 3.5,
-        "rolling_price_std": 0.009, "rolling_volume_std": 40.0,
+        "abs_return_max": 0.1150, "return_std": 0.0210, "price_range_rel": 0.1240,
+        "volume_max_ratio": 4.2, "volume_cv": 1.30,
     },
 }
 
 CSV_COLUMNS = (
-    "id", "timestamp", "symbol", "z_score_price", "z_score_log_return",
-    "z_score_volume", "rolling_price_std", "rolling_volume_std",
+    "id", "timestamp", "symbol", "abs_return_max", "return_std",
+    "price_range_rel", "volume_max_ratio", "volume_cv",
     "anomaly_score", "is_anomaly",
 )
 
@@ -112,7 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
     feed.add_argument("--once", action="store_true", help="print the tail and stop")
     feed.add_argument("--json", action="store_true", help="one JSON object per line")
 
-    stats = sub.add_parser("stats", parents=[common], help="the buffer, aggregated")
+    stats = sub.add_parser("stats", parents=[common], help="what has been scored, aggregated")
     stats.add_argument("-s", "--symbol", metavar="PAIR", help="one pair only")
     stats.add_argument("--depth", type=int, default=200, metavar="N",
                        help="how many predictions the trend is drawn from (default: 200)")
@@ -123,11 +125,16 @@ def build_parser() -> argparse.ArgumentParser:
                          help=f"the pair to label it with (default: {SYMBOLS[0]})")
     predict.add_argument("-p", "--preset", choices=sorted(PRESETS),
                          help="start from a known shape, then override what you want")
-    predict.add_argument("--z-price", type=float, dest="z_score_price")
-    predict.add_argument("--z-return", type=float, dest="z_score_log_return")
-    predict.add_argument("--z-volume", type=float, dest="z_score_volume")
-    predict.add_argument("--price-std", type=float, dest="rolling_price_std")
-    predict.add_argument("--volume-std", type=float, dest="rolling_volume_std")
+    predict.add_argument("--max-return", type=float, dest="abs_return_max",
+                         help="largest absolute log return in the window")
+    predict.add_argument("--return-std", type=float, dest="return_std",
+                         help="realised volatility over the window")
+    predict.add_argument("--price-range", type=float, dest="price_range_rel",
+                         help="(high - low) / mean price")
+    predict.add_argument("--volume-peak", type=float, dest="volume_max_ratio",
+                         help="largest trade over the window's mean volume")
+    predict.add_argument("--volume-cv", type=float, dest="volume_cv",
+                         help="volume deviation over mean volume")
     predict.add_argument("--stdin", action="store_true",
                          help="read one JSON vector per line instead, and score each")
     predict.add_argument("--fail-on-anomaly", action="store_true",

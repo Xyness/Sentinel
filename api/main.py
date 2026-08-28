@@ -2,15 +2,15 @@ import logging
 import os
 import socket
 import time
-from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
-from itertools import count
 from urllib.request import urlopen
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Query
 from model_loader import MODEL_PATH, AnomalyModel
 from schemas import (
+    FeatureBatch,
     FeatureStat,
     FeatureVector,
     HealthResponse,
@@ -23,6 +23,7 @@ from schemas import (
     SymbolStats,
     SystemStatusResponse,
 )
+from store import FEATURE_COLUMNS, PredictionStore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -31,16 +32,20 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Sentinel - Anomaly Detection API",
     description="Real-time anomaly detection on crypto markets",
-    version="1.0.0",
+    version="1.1.0",
 )
 
 model = AnomalyModel()
 
-# In-memory ring buffer for prediction history. Each entry carries an id so a
-# client following the feed can ask for what it has not seen; the counter is
-# per-process, which is why a follower also has to cope with it starting over.
-prediction_history: deque = deque(maxlen=500)
-prediction_ids = count(1)
+# Predictions live in SQLite rather than in a deque, so a restart no longer
+# throws away everything the pipeline has flagged. With no PREDICTIONS_DB set
+# the database is in memory and behaves the way the deque did.
+store = PredictionStore()
+
+# How many of the most recent rows /stats aggregates. The whole table would be
+# an honest answer too, but a week of history makes a percentile that reacts to
+# nothing, and this endpoint exists to describe the recent past.
+STATS_ROWS = int(os.environ.get("STATS_ROWS", "5000"))
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -53,27 +58,35 @@ def health():
     }
 
 
-@app.post("/predict", response_model=PredictionResult)
-def predict(features: FeatureVector):
-    # Try loading model if it wasn't available at startup
-    model.ensure_loaded()
+def _vector(features: FeatureVector) -> list:
+    return [getattr(features, name) for name in FEATURE_COLUMNS]
 
+
+def _record(features: FeatureVector, score, is_anomaly) -> dict:
+    return store.append(
+        features.symbol,
+        {name: getattr(features, name) for name in FEATURE_COLUMNS},
+        score,
+        is_anomaly,
+    )
+
+
+def _require_model():
+    model.ensure_loaded()
     if not model.loaded:
         raise HTTPException(
             status_code=503,
             detail="Model not yet available. Training may still be in progress."
         )
 
-    feature_array = [
-        features.z_score_price,
-        features.z_score_log_return,
-        features.z_score_volume,
-        features.rolling_price_std,
-        features.rolling_volume_std
-    ]
+
+@app.post("/predict", response_model=PredictionResult)
+def predict(features: FeatureVector):
+    # Try loading model if it wasn't available at startup
+    _require_model()
 
     try:
-        score, is_anomaly = model.predict(feature_array)
+        score, is_anomaly = model.predict(_vector(features))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except RuntimeError as e:
@@ -87,25 +100,48 @@ def predict(features: FeatureVector):
         f"score={score:.4f}, anomaly={is_anomaly}"
     )
 
-    # Store in ring buffer
-    prediction_history.append({
-        "id": next(prediction_ids),
-        "timestamp": datetime.now(UTC).isoformat(),
-        "symbol": features.symbol,
-        "z_score_price": features.z_score_price,
-        "z_score_log_return": features.z_score_log_return,
-        "z_score_volume": features.z_score_volume,
-        "rolling_price_std": features.rolling_price_std,
-        "rolling_volume_std": features.rolling_volume_std,
-        "anomaly_score": float(score),
-        "is_anomaly": bool(is_anomaly)
-    })
+    _record(features, score, is_anomaly)
 
     return {
         "symbol": features.symbol,
         "anomaly_score": float(score),
         "is_anomaly": bool(is_anomaly)
     }
+
+
+@app.post("/predict/batch", response_model=list[PredictionResult])
+def predict_batch(batch: FeatureBatch):
+    """Score a whole Parquet file's worth of rows in one call.
+
+    The scorer used to POST one row at a time, which is one HTTP round trip and
+    one single-row scaler call per window. The forest is happy to take the lot
+    at once and the results come back in the order they were sent.
+    """
+    _require_model()
+
+    try:
+        scored = model.predict_many([_vector(vector) for vector in batch.vectors])
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Batch prediction failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}") from e
+
+    results = []
+    flagged = 0
+    for features, (score, is_anomaly) in zip(batch.vectors, scored, strict=True):
+        _record(features, score, is_anomaly)
+        flagged += bool(is_anomaly)
+        results.append({
+            "symbol": features.symbol,
+            "anomaly_score": float(score),
+            "is_anomaly": bool(is_anomaly),
+        })
+
+    logger.info(f"Scored {len(results)} vector(s), {flagged} flagged")
+    return results
 
 
 @app.get("/latest-predictions", response_model=list[PredictionHistoryItem])
@@ -115,18 +151,12 @@ def latest_predictions(
     after: int | None = Query(default=None, ge=0,
                                  description="only entries newer than this id")
 ):
-    items = list(prediction_history)
-    if symbol:
-        items = [i for i in items if i["symbol"] == symbol]
-    if after is not None:
-        items = [i for i in items if i["id"] > after]
-    return items[-limit:]
+    return store.latest(limit=limit, symbol=symbol, after=after)
 
 
 # Service reachability helpers, used by /system-status
 
-def _check_http(url: str, timeout: float = 3.0) -> ServiceStatus:
-    name = url.split("//")[1].split("/")[0].split(":")[0].capitalize()
+def _check_http(name: str, url: str, timeout: float = 3.0) -> ServiceStatus:
     start = time.time()
     try:
         resp = urlopen(url, timeout=timeout)
@@ -154,43 +184,23 @@ def _check_tcp(host: str, port: int, name: str, timeout: float = 2.0) -> Service
                              details=str(e)[:200])
 
 
-def _check_zookeeper(host: str = "zookeeper", port: int = 2181,
-                     timeout: float = 2.0) -> ServiceStatus:
-    start = time.time()
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(timeout)
-        s.connect((host, port))
-        s.sendall(b"ruok")
-        resp = s.recv(4)
-        elapsed = (time.time() - start) * 1000
-        s.close()
-        ok = resp == b"imok"
-        return ServiceStatus(
-            name="Zookeeper", status="online" if ok else "degraded",
-            response_time_ms=round(elapsed, 1),
-            details=None if ok else f"Unexpected response: {resp!r}",
-        )
-    except Exception as e:
-        elapsed = (time.time() - start) * 1000
-        return ServiceStatus(name="Zookeeper", status="offline",
-                             response_time_ms=round(elapsed, 1),
-                             details=str(e)[:200])
-
-
 @app.get("/system-status", response_model=SystemStatusResponse)
 def system_status():
-    services = [
-        ServiceStatus(name="API", status="online", response_time_ms=0.0),
+    # Run the probes at the same time. One after another, a stack that is
+    # entirely down took the sum of every timeout to say so, and this is the
+    # endpoint you call precisely when things are not answering.
+    probes = [
         # The Spark UI usually answers in under 100ms, but it is served off the
         # driver, so a micro-batch or a GC pause can hold the thread well past a
         # second. Three was tight enough to report a healthy Spark as offline.
-        _check_http("http://spark:4040/api/v1/applications", timeout=8.0),
-        _check_tcp("kafka", 9092, "Kafka", timeout=2.0),
-        _check_zookeeper("zookeeper", 2181, timeout=2.0),
+        lambda: _check_http("Spark", "http://spark:4040/api/v1/applications", timeout=8.0),
+        lambda: _check_tcp("kafka", 9092, "Kafka", timeout=2.0),
     ]
-    # Fix Spark name (helper derives from host)
-    services[1].name = "Spark"
+
+    with ThreadPoolExecutor(max_workers=len(probes)) as pool:
+        checked = list(pool.map(lambda probe: probe(), probes))
+
+    services = [ServiceStatus(name="API", status="online", response_time_ms=0.0), *checked]
     return SystemStatusResponse(
         services=services,
         timestamp=datetime.now(UTC).isoformat(),
@@ -199,12 +209,12 @@ def system_status():
 
 @app.get("/stats", response_model=StatsResponse)
 def stats():
-    items = list(prediction_history)
+    items = store.recent(STATS_ROWS)
     total = len(items)
     if total == 0:
         return StatsResponse(
             total_predictions=0, total_anomalies=0, anomaly_rate=0.0,
-            avg_score=0.0, per_symbol={},
+            avg_score=0.0, per_symbol={}, stored=0,
         )
 
     scores = np.array([i["anomaly_score"] for i in items])
@@ -235,12 +245,8 @@ def stats():
     )
 
     # Feature stats
-    feature_cols = [
-        "z_score_price", "z_score_log_return", "z_score_volume",
-        "rolling_price_std", "rolling_volume_std",
-    ]
     feature_stats = {}
-    for col in feature_cols:
+    for col in FEATURE_COLUMNS:
         vals = np.array([i[col] for i in items])
         feature_stats[col] = FeatureStat(
             mean=round(float(vals.mean()), 6),
@@ -257,6 +263,7 @@ def stats():
         per_symbol=per_symbol,
         score_percentiles=percentiles,
         feature_stats=feature_stats,
+        stored=store.count(),
     )
 
 
@@ -268,8 +275,6 @@ def model_info():
 
     m = model.model
     s = model.scaler
-    feature_names = ["z_score_price", "z_score_log_return", "z_score_volume",
-                     "rolling_price_std", "rolling_volume_std"]
 
     info = ModelInfoResponse(
         loaded=True,
@@ -277,9 +282,12 @@ def model_info():
         n_estimators=getattr(m, "n_estimators", None),
         contamination=float(getattr(m, "contamination", 0)),
         max_samples=str(getattr(m, "max_samples", "auto")),
-        feature_names=feature_names,
+        # Read off the bundle rather than hardcoded here, so a model fitted on a
+        # different feature set says so instead of mislabelling its own scaler.
+        feature_names=list(model.features),
         scaler_means=[round(float(v), 6) for v in s.mean_] if hasattr(s, "mean_") else None,
         scaler_stds=[round(float(v), 6) for v in s.scale_] if hasattr(s, "scale_") else None,
+        metrics=model.metrics,
     )
 
     if os.path.exists(MODEL_PATH):

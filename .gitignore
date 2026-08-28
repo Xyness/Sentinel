@@ -1,5 +1,3 @@
-docs/choices.md
-
 # Secrets. Rien de ce qui suit ne doit jamais atteindre un commit.
 .env
 .env.*
