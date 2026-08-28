@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY scorer/ ./
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN useradd --create-home appuser
+USER appuser
+
+CMD ["python", "scorer.py"]

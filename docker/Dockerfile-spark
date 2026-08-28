@@ -1,0 +1,21 @@
+# Stage 1: Build the JAR with Maven
+FROM maven:3.9-eclipse-temurin-11 AS builder
+
+WORKDIR /build
+
+COPY spark-java/pom.xml ./pom.xml
+RUN mvn dependency:go-offline -B
+
+COPY spark-java/src ./src
+RUN mvn package -DskipTests -B
+
+# Stage 2: Runtime with Spark
+FROM apache/spark:3.5.3
+
+USER root
+RUN mkdir -p /opt/spark-apps
+COPY --from=builder /build/target/spark-java-1.0-SNAPSHOT.jar /opt/spark-apps/app.jar
+
+ENV PATH="/opt/spark/bin:${PATH}"
+
+WORKDIR /opt/spark-apps/

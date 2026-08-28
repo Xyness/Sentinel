@@ -1,0 +1,39 @@
+docs/choices.md
+
+# Secrets. Rien de ce qui suit ne doit jamais atteindre un commit.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*auth*.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+dist/
+build/
+.eggs/
+
+# Java
+target/
+*.class
+*.jar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# Data & Models
+data/
+models/
+*.parquet
+
+# OS
+.DS_Store
+Thumbs.db

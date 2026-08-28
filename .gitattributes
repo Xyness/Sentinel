@@ -1,0 +1,9 @@
+# One line ending in the repository, whatever wrote the file. Half this tree was
+# authored on Windows and half through Linux tooling, so every cross-platform
+# edit was turning into a whole-file diff. LF is also what the images want: a
+# shell script that reaches a container with CRLF in it does not run.
+* text=auto eol=lf
+
+*.jar binary
+*.joblib binary
+*.parquet binary
